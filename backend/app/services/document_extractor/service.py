@@ -39,6 +39,12 @@ class DocumentExtractionService:
         if hasattr(extractor, "extract"):
             if path.suffix.lower() == ".pdf":
                 raw_text, library_used = extractor.extract(path)  # type: ignore[assignment]
+            elif path.suffix.lower() in (".docx", ".doc"):
+                raw_text = extractor.extract(path)
+                library_used = "python-docx"
+            elif path.suffix.lower() in (".pptx", ".ppt"):
+                raw_text = extractor.extract(path)
+                library_used = "python-pptx"
             else:
                 raw_text = extractor.extract(path)  # type: ignore[assignment]
                 library_used = "default"

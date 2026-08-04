@@ -209,7 +209,21 @@ class CurriculumStructureService:
         current_topic = None
         current_subtopic = None
 
+        # Check if the text contains any structural headers (other than program)
+        has_structure = False
+        for line in lines:
+            if not line.strip():
+                continue
+            from app.services.curriculum_structure.utils.regex_patterns import CurriculumRegexPatterns
+            if CurriculumRegexPatterns.should_ignore_line(line):
+                continue
+            matched = self._try_match_hierarchy(line, {}, {}, {}, {}, {})
+            if matched:
+                has_structure = True
+                break
+
         # Process each line
+        first_line_processed = False
         for line_num, line in enumerate(lines, 1):
             line = line.rstrip()  # Remove trailing whitespace but keep leading for indentation analysis
             if not line.strip():
@@ -223,15 +237,21 @@ class CurriculumStructureService:
 
             # Try to match hierarchical patterns
             matched = self._try_match_hierarchy(line, current_program,
-                                              current_module, current_lesson,
-                                              current_topic, current_subtopic)
+                                               current_module, current_lesson,
+                                               current_topic, current_subtopic)
 
             if matched:
                 current_program, current_module, current_lesson, current_topic, current_subtopic = matched
+                first_line_processed = True
             else:
                 # Treat as content - add to current deepest level
-                self._add_content_to_current_level(line, current_program, current_module,
-                                                 current_lesson, current_topic, current_subtopic)
+                if has_structure and not first_line_processed and current_program["title"] == "Untitled Program":
+                    current_program["title"] = line.strip()
+                    first_line_processed = True
+                else:
+                    self._add_content_to_current_level(line, current_program, current_module,
+                                                     current_lesson, current_topic, current_subtopic)
+                    first_line_processed = True
 
         # Clean up empty containers
         self._cleanup_empty_containers(structure["program"])
@@ -248,23 +268,23 @@ class CurriculumStructureService:
         # Patterns for different levels (from most specific to least specific for proper nesting)
         patterns = [
             # Concept patterns
+            (r'(?i)^\s*(concept|idea|principle|theorem|law|rule)\s+([\d\.\-A-Za-z]+)\s*[:.-]?\s*(.+)$', 'concept'),
             (r'(?i)^\s*(concept|idea|principle|theorem|law|rule)\s*[:.-]?\s*(.+)$', 'concept'),
-            (r'(?i)^\s*(concept|idea|principle|theorem|law|rule)\s+(\d+|[ivxlcdm]+|[a-z])\s*[:.-]?\s*(.+)$', 'concept'),
             # Subtopic patterns
+            (r'(?i)^\s*(subtopic|sub-topic|subsection)\s+([\d\.\-A-Za-z]+)\s*[:.-]?\s*(.+)$', 'subtopic'),
             (r'(?i)^\s*(subtopic|sub-topic|subsection)\s*[:.-]?\s*(.+)$', 'subtopic'),
-            (r'(?i)^\s*(subtopic|sub-topic|subsection)\s+(\d+|[ivxlcdm]+|[a-z])\s*[:.-]?\s*(.+)$', 'subtopic'),
             # Topic patterns
+            (r'(?i)^\s*(topic|subject|theme|section)\s+([\d\.\-A-Za-z]+)\s*[:.-]?\s*(.+)$', 'topic'),
             (r'(?i)^\s*(topic|subject|theme|section)\s*[:.-]?\s*(.+)$', 'topic'),
-            (r'(?i)^\s*(topic|subject|theme|section)\s+(\d+|[ivxlcdm]+|[a-z])\s*[:.-]?\s*(.+)$', 'topic'),
             # Lesson patterns
+            (r'(?i)^\s*(lesson|lecture|session|chapter)\s+([\d\.\-A-Za-z]+)\s*[:.-]?\s*(.+)$', 'lesson'),
             (r'(?i)^\s*(lesson|lecture|session|chapter)\s*[:.-]?\s*(.+)$', 'lesson'),
-            (r'(?i)^\s*(lesson|lecture|session|chapter)\s+(\d+|[ivxlcdm]+|[a-z])\s*[:.-]?\s*(.+)$', 'lesson'),
             # Module patterns
+            (r'(?i)^\s*(module|unit|block|part)\s+([\d\.\-A-Za-z]+)\s*[:.-]?\s*(.+)$', 'module'),
             (r'(?i)^\s*(module|unit|block|part)\s*[:.-]?\s*(.+)$', 'module'),
-            (r'(?i)^\s*(module|unit|block|part)\s+(\d+|[ivxlcdm]+|[a-z])\s*[:.-]?\s*(.+)$', 'module'),
             # Program patterns
+            (r'(?i)^\s*(program|programme|degree|course)\s+([\d\.\-A-Za-z]+)\s*[:.-]?\s*(.+)$', 'program'),
             (r'(?i)^\s*(program|programme|degree|course)\s*[:.-]?\s*(.+)$', 'program'),
-            (r'(?i)^\s*(program|programme|degree|course)\s+(\d+|[ivxlcdm]+|[a-z])\s*[:.-]?\s*(.+)$', 'program'),
         ]
 
         for pattern, level in patterns:

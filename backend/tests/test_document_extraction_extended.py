@@ -10,7 +10,7 @@ from app.services.document_extractor.service import DocumentExtractionService
 
 def test_extracts_text_from_pdf():
     # Use an existing PDF from the uploads directory
-    pdf_path = Path("../uploads/science/2023-2024/6/syllabus/joining_report.pdf")
+    pdf_path = Path("../uploads/science/2023-2024/6/syllabus/UML_Diagrams_All_Systems.pdf")
     assert pdf_path.exists(), f"PDF file not found: {pdf_path}"
 
     service = DocumentExtractionService(db=None)  # Don't update the database in the test
@@ -28,7 +28,7 @@ def test_extracts_text_from_pdf():
 
 def test_extracts_text_from_docx():
     # Use an existing DOCX from the uploads directory
-    docx_path = Path("../uploads/science/2023-2024/6/syllabus/UNIT_I_FUNDAMENTALS_OF_ENTREPRENEURSHIP.docx")
+    docx_path = Path("../uploads/science/2023-2024/6/syllabus/UNIT_II_BUSINESS_IDEAS_AND_OPPORTUNITY_IDENTIFICATION.docx")
     assert docx_path.exists(), f"DOCX file not found: {docx_path}"
 
     service = DocumentExtractionService(db=None)

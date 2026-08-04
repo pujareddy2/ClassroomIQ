@@ -6,10 +6,9 @@ from app.services.document_extractor.service import DocumentExtractionService
 
 def test_extracts_text_from_pdf():
     # Use an existing PDF from the uploads directory
-    pdf_path = Path("../uploads/science/2023-2024/6/syllabus/joining_report.pdf")
+    pdf_path = Path("../uploads/science/2023-2024/6/syllabus/UML_Diagrams_All_Systems.pdf")
     assert pdf_path.exists(), f"PDF file not found: {pdf_path}"
 
-    """
     service = DocumentExtractionService(db=None)  # Don't update the database in the test
     result = service.extract_text_from_path(pdf_path)
     
@@ -25,7 +24,7 @@ def test_extracts_text_from_pdf():
 
 def test_extracts_text_from_docx():
     # Use an existing DOCX from the uploads directory
-    docx_path = Path("../uploads/science/2023-2024/6/syllabus/UNIT_I_FUNDAMENTALS_OF_ENTREPRENEURSHIP.docx")
+    docx_path = Path("../uploads/science/2023-2024/6/syllabus/UNIT_II_BUSINESS_IDEAS_AND_OPPORTUNITY_IDENTIFICATION.docx")
     assert docx_path.exists(), f"DOCX file not found: {docx_path}"
 
     service = DocumentExtractionService(db=None)
@@ -62,7 +61,7 @@ def test_extracts_text_from_txt(tmp_path: Path):
 def test_extracts_text_from_pptx():
     # We don't have a PPTX file in the uploads, so we skip this test for now.
     # Alternatively, we could create a simple PPTX, but that requires the
-    impor pytest
+    import pytest
     pytest.skip("No PPTX file available for testing")
     
     # If we had a PPTX file, we would do:
