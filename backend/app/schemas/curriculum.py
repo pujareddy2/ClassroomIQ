@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,6 +20,29 @@ class CurriculumUploadMetadata(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
 
 
+# ── Structured curriculum response models ──────────────────────────────────────
+
+class ChapterSchema(BaseModel):
+    """A chapter / section inside a unit."""
+    title: str
+    topics: list[str] = Field(default_factory=list)
+
+
+class UnitSchema(BaseModel):
+    """A single unit / module of the syllabus."""
+    unit_number: int
+    title: str
+    chapters: list[ChapterSchema] = Field(default_factory=list)
+    learning_outcomes: list[str] = Field(default_factory=list)
+
+
+class ParsedCurriculumSchema(BaseModel):
+    """The fully parsed curriculum tree returned after upload."""
+    title: str
+    course_id: UUID
+    units: list[UnitSchema] = Field(default_factory=list)
+
+
 class CurriculumUploadResponse(BaseModel):
     status: str
     message: str
@@ -27,8 +50,11 @@ class CurriculumUploadResponse(BaseModel):
     course_id: UUID
     processing_status: ProcessingStatus
     uploaded_at: datetime
+    # Structured curriculum tree (primary output)
+    curriculum: ParsedCurriculumSchema | None = None
+    # Raw text and metadata kept for debugging / downstream use
     extracted_text: str | None = None
-    metadata: dict[str, object] | None = None
+    extraction_metadata: dict[str, Any] | None = None
 
 
 class CurriculumRecord(BaseModel):
@@ -44,3 +70,25 @@ class CurriculumRecord(BaseModel):
     file_size: int
     processing_status: str
     uploaded_at: datetime
+
+
+class CurriculumListItem(BaseModel):
+    """Lightweight curriculum record for list/search responses."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_id: UUID
+    faculty_id: UUID
+    title: str
+    document_type: str
+    file_name: str
+    processing_status: str
+    uploaded_at: datetime
+    description: str | None = None
+
+
+class CurriculumDeleteResponse(BaseModel):
+    """Response returned after a successful soft-delete of a curriculum."""
+    curriculum_id: UUID
+    status: str = "DELETED"
+    message: str = "Curriculum soft-deleted successfully."

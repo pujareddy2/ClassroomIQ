@@ -1,0 +1,17 @@
+
+CLASSROOM IQ ACADEMIC SYLLABUS - COMPILER DESIGN
+Course Code: CS501
+Faculty: Dr. Test Faculty
+
+UNIT I - Introduction to Compiler
+Overview of Compilation, Compiler Definition, Language Processors, Phases of Compiler, Lexical Analysis, Syntax Analysis.
+CO1: Understand the fundamental phases of a compiler.
+
+UNIT II - Lexical Analysis
+Role of Lexical Analyzer, Input Buffering, Specification of Tokens, Recognition of Tokens, Finite Automata.
+CO2: Design lexical analyzers using regular expressions and finite automata.
+
+UNIT III - Syntax Analysis
+Context Free Grammars, Top Down Parsing, LL(1) Parsers, Bottom Up Parsing, LR Parsers.
+CO3: Implement syntax analysis and parsing algorithms.
+        

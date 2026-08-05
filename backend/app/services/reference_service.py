@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
-from uuid import UUID
+import logging
+from typing import Any
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from app.utils.file_validation import (
 )
 from app.utils.storage import build_document_directory, save_document_bytes
 
+logger = logging.getLogger(__name__)
 PROCESSING_STATUS_UPLOADED = "UPLOADED"
 
 
@@ -29,19 +30,28 @@ class ReferenceService:
     def __init__(self, db: Session) -> None:
         self.repository = ReferenceRepository(db)
 
-    async def upload_reference_material(self, metadata: ReferenceUploadMetadata, upload_file: UploadFile) -> tuple[ReferenceMaterial, ReferenceUploadResponse]:
+    async def upload_reference_material(
+        self,
+        metadata: ReferenceUploadMetadata,
+        upload_file: UploadFile,
+    ) -> tuple[ReferenceMaterial, ReferenceUploadResponse]:
         if not metadata.title.strip():
             raise MissingMetadataError("Title is required")
 
+        # ── Resolve faculty ────────────────────────────────────────────────
         faculty = self.repository.get_faculty_by_name(metadata.faculty_name)
         if faculty is None:
             raise LookupError(f"Faculty '{metadata.faculty_name}' not found")
 
+        # ── Resolve or create course ───────────────────────────────────────
         course = self.repository.get_course_by_selector(metadata.course_name)
         if course is None:
             normalized_code = metadata.course_name.strip().upper().replace(" ", "_")[:50]
-            course = self.repository.create_course(normalized_code, metadata.course_name.strip(), faculty.department_id)
+            course = self.repository.create_course(
+                normalized_code, metadata.course_name.strip(), faculty.department_id
+            )
 
+        # ── Resolve or create academic term ───────────────────────────────
         semester_number = normalize_semester(metadata.semester)
         start_date, end_date = parse_academic_year_dates(metadata.academic_year)
         academic_term = self.repository.get_or_create_academic_term(
@@ -52,15 +62,27 @@ class ReferenceService:
             end_date=end_date,
         )
 
+        # ── Validate file ──────────────────────────────────────────────────
         document_type = validate_document_type(metadata.document_type, ALLOWED_REFERENCE_TYPES)
-        validate_file_extension(upload_file.filename or "")
+        file_extension = validate_file_extension(upload_file.filename or "")
 
         content = await upload_file.read(settings.max_file_size_bytes + 1)
         validate_file_size(len(content), settings.max_file_size_bytes)
 
-        directory = build_document_directory(course.course_name, academic_term.academic_year, str(metadata.semester), document_type)
-        saved_path = save_document_bytes(directory, upload_file.filename or "reference_document", content)
+        # ── Save file to disk ──────────────────────────────────────────────
+        directory = build_document_directory(
+            course.course_name,
+            academic_term.academic_year,
+            str(metadata.semester),
+            document_type,
+        )
+        saved_path = save_document_bytes(
+            directory,
+            upload_file.filename or f"reference_document{file_extension}",
+            content,
+        )
 
+        # ── Persist record ─────────────────────────────────────────────────
         reference_material = ReferenceMaterial(
             course_id=course.id,
             faculty_id=faculty.id,
@@ -83,9 +105,21 @@ class ReferenceService:
             self.repository.db.rollback()
             raise
 
-        extraction_service = DocumentExtractionService(self.repository.db)
-        extracted = extraction_service.extract_text_from_path(saved_path)
-        extraction_service.update_document_record(created, extracted)
+        # ── Extract text (non-fatal) ───────────────────────────────────────
+        extracted_text: str | None = None
+        extraction_metadata: dict[str, Any] | None = None
+        try:
+            extraction_service = DocumentExtractionService(self.repository.db)
+            extracted = extraction_service.extract_text_from_path(saved_path)
+            # Only update processing_status — avoid touching missing ORM columns
+            created.processing_status = "TEXT_EXTRACTED"
+            self.repository.db.add(created)
+            self.repository.db.flush()
+            extracted_text = extracted.text
+            extraction_metadata = extracted.metadata
+        except Exception as exc:
+            logger.warning("Text extraction failed for reference material: %s", exc)
+            # Non-fatal — record stays in UPLOADED status
 
         response = ReferenceUploadResponse(
             status="success",
@@ -94,7 +128,7 @@ class ReferenceService:
             course_id=created.course_id,
             processing_status=created.processing_status,
             uploaded_at=created.created_at,
-            extracted_text=extracted.text,
-            metadata=extracted.metadata,
+            extracted_text=extracted_text,
+            extraction_metadata=extraction_metadata,
         )
         return created, response

@@ -67,13 +67,7 @@ class DocumentExtractionService:
 
         document.processing_status = "TEXT_EXTRACTED"
         document.file_name = extracted.metadata["file_name"]
-        if not getattr(document, "library_used", None):
-            setattr(document, "library_used", extracted.metadata.get("library_used"))
-        if not getattr(document, "character_count", None):
-            setattr(document, "character_count", extracted.metadata.get("character_count"))
-        if not getattr(document, "page_count", None):
-            setattr(document, "page_count", None)
-        if not getattr(document, "last_processed_at", None):
-            setattr(document, "last_processed_at", None)
+        if hasattr(document, "extracted_text"):
+            setattr(document, "extracted_text", extracted.text)
         self.db.add(document)
-        self.db.commit()
+        self.db.flush()

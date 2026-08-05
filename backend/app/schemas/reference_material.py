@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -28,7 +28,7 @@ class ReferenceUploadResponse(BaseModel):
     processing_status: ProcessingStatus
     uploaded_at: datetime
     extracted_text: str | None = None
-    metadata: dict[str, object] | None = None
+    extraction_metadata: dict[str, Any] | None = None
 
 
 class ReferenceRecord(BaseModel):
@@ -44,3 +44,27 @@ class ReferenceRecord(BaseModel):
     file_size: int
     processing_status: str
     created_at: datetime
+
+
+class ReferenceListItem(BaseModel):
+    """Lightweight reference material record for list/search responses."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_id: UUID
+    faculty_id: UUID
+    title: str
+    document_type: str
+    file_name: str
+    processing_status: str
+    created_at: datetime
+    description: str | None = None
+    author: str | None = None
+    edition: str | None = None
+
+
+class ReferenceDeleteResponse(BaseModel):
+    """Response returned after a successful soft-delete of a reference material."""
+    reference_id: UUID
+    status: str = "DELETED"
+    message: str = "Reference material soft-deleted successfully."

@@ -12,6 +12,8 @@ class Topic(Base):
     curriculum_id: Mapped[UUID] = mapped_column(ForeignKey("curricula.id", ondelete="CASCADE"), nullable=False)
     parent_topic_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
     topic_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    node_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     expected_hours: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"), nullable=False)
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
 

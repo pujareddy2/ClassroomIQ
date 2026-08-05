@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, ForeignKey, TIMESTAMP, text, UniqueConstraint
+from sqlalchemy import String, Integer, ForeignKey, TIMESTAMP, Text, text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
@@ -22,6 +22,7 @@ class Curriculum(Base):
     syllabus_version: Mapped[str] = mapped_column(String(50), nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
     processing_status: Mapped[str] = mapped_column(String(30), server_default=text("'UPLOADED'"), nullable=False)
+    extracted_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Audit & Soft Delete Columns
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)

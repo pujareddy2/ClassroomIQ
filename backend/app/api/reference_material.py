@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from typing import Annotated
 from uuid import UUID
 
@@ -10,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.reference_material import ReferenceUploadMetadata, ReferenceUploadResponse
+from app.schemas.response import created
 from app.services.reference_service import ReferenceService
 from app.utils.file_validation import (
     FileTooLargeError,
@@ -18,10 +21,16 @@ from app.utils.file_validation import (
     UnsupportedFileTypeError,
 )
 
-router = APIRouter(prefix="/reference", tags=["Reference Uploads"])
+router = APIRouter(prefix="/reference", tags=["Reference Material"])
 
 
-@router.post("/upload", response_model=ReferenceUploadResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload",
+    response_model=None,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload reference material",
+    description="Validates, extracts, and persists a course reference document for technical validation.",
+)
 async def upload_reference_material(
     course_name: Annotated[str, Form(...)],
     academic_year: Annotated[str, Form(...)],
@@ -32,18 +41,8 @@ async def upload_reference_material(
     db: Annotated[Session, Depends(get_db)],
     document_type: Annotated[str, Form(...)],
     description: Annotated[str | None, Form(...)] = None,
-) -> ReferenceUploadResponse:
+) -> dict:
     service = ReferenceService(db)
-    metadata = ReferenceUploadMetadata(
-        course_name=course_name,
-        academic_year=academic_year,
-        semester=semester,
-        faculty_name=faculty_name,
-        title=title,
-        document_type=document_type,  # type: ignore[arg-type]
-        description=description,
-    )
-
     try:
         metadata = ReferenceUploadMetadata(
             course_name=course_name,
@@ -54,9 +53,10 @@ async def upload_reference_material(
             document_type=document_type,  # type: ignore[arg-type]
             description=description,
         )
+        start = time.time()
         _, response = await service.upload_reference_material(metadata, file)
         db.commit()
-        return response
+        return created(data=response.model_dump(), message="Reference material uploaded.", start_ts=start)
     except ValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()) from exc
     except UnsupportedFileTypeError as exc:

@@ -14,7 +14,7 @@ from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserP
 from app.services.auth_service import login_user, register_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 @router.post("/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
