@@ -1,0 +1,195 @@
+erDiagram
+
+    INSTITUTION {
+        UUID id PK
+        string name
+        string address
+        string contact_email
+        datetime created_at
+    }
+
+    DEPARTMENT {
+        UUID id PK
+        UUID institution_id FK
+        string name
+        string code
+    }
+
+    USER {
+        UUID id PK
+        string full_name
+        string email
+        string password_hash
+        string role
+        boolean is_active
+    }
+
+    FACULTY {
+        UUID id PK
+        UUID user_id FK
+        UUID department_id FK
+        string employee_id
+        string designation
+    }
+
+    COURSE {
+        UUID id PK
+        UUID department_id FK
+        string course_code
+        string course_name
+        integer credits
+    }
+
+    ACADEMIC_TERM {
+        UUID id PK
+        string academic_year
+        string semester
+        date start_date
+        date end_date
+    }
+
+    CURRICULUM {
+        UUID id PK
+        UUID course_id FK
+        UUID academic_term_id FK
+        string syllabus_version
+        datetime uploaded_at
+    }
+
+    TOPIC {
+        UUID id PK
+        UUID curriculum_id FK
+        UUID parent_topic_id FK
+        string topic_name
+        integer expected_hours
+        integer sequence_number
+    }
+
+    REFERENCE_MATERIAL {
+        UUID id PK
+        UUID course_id FK
+        string title
+        string author
+        string file_path
+        string edition
+    }
+
+    TOPIC_REFERENCE {
+        UUID id PK
+        UUID topic_id FK
+        UUID reference_material_id FK
+    }
+
+    LECTURE_SESSION {
+        UUID id PK
+        UUID course_id FK
+        UUID faculty_id FK
+        date lecture_date
+        integer duration_minutes
+        string classroom
+    }
+
+    RECORDING {
+        UUID id PK
+        UUID session_id FK
+        string video_path
+        string audio_path
+        datetime uploaded_at
+    }
+
+    TRANSCRIPT {
+        UUID id PK
+        UUID recording_id FK
+        string language
+        integer total_words
+    }
+
+    TRANSCRIPT_SEGMENT {
+        UUID id PK
+        UUID transcript_id FK
+        UUID topic_id FK
+        float start_time
+        float end_time
+        string speaker
+        text transcript_text
+    }
+
+    COVERAGE_REPORT {
+        UUID id PK
+        UUID session_id FK
+        float coverage_percentage
+        integer topics_covered
+        integer topics_missed
+    }
+
+    VALIDATION_FLAG {
+        UUID id PK
+        UUID segment_id FK
+        UUID reference_material_id FK
+        string issue_type
+        text ai_explanation
+        float confidence_score
+    }
+
+    REVIEW_DECISION {
+        UUID id PK
+        UUID flag_id FK
+        UUID reviewer_id FK
+        string decision
+        text reviewer_comments
+        datetime reviewed_at
+    }
+
+    RECOMMENDATION {
+        UUID id PK
+        UUID session_id FK
+        string recommendation_type
+        text recommendation_text
+        integer priority
+    }
+
+    REPORT {
+        UUID id PK
+        UUID faculty_id FK
+        UUID session_id FK
+        string report_type
+        datetime generated_at
+    }
+
+    INSTITUTION ||--o{ DEPARTMENT : has
+    DEPARTMENT ||--o{ FACULTY : contains
+    DEPARTMENT ||--o{ COURSE : offers
+
+    USER ||--|| FACULTY : profile
+
+    COURSE ||--o{ CURRICULUM : has
+    ACADEMIC_TERM ||--o{ CURRICULUM : version
+
+    CURRICULUM ||--o{ TOPIC : contains
+
+    COURSE ||--o{ REFERENCE_MATERIAL : has
+
+    TOPIC ||--o{ TOPIC_REFERENCE : maps
+    REFERENCE_MATERIAL ||--o{ TOPIC_REFERENCE : references
+
+    COURSE ||--o{ LECTURE_SESSION : schedules
+    FACULTY ||--o{ LECTURE_SESSION : teaches
+
+    LECTURE_SESSION ||--|| RECORDING : produces
+    RECORDING ||--|| TRANSCRIPT : generates
+    TRANSCRIPT ||--o{ TRANSCRIPT_SEGMENT : contains
+
+    TOPIC ||--o{ TRANSCRIPT_SEGMENT : aligns
+
+    LECTURE_SESSION ||--|| COVERAGE_REPORT : produces
+
+    TRANSCRIPT_SEGMENT ||--o{ VALIDATION_FLAG : generates
+    REFERENCE_MATERIAL ||--o{ VALIDATION_FLAG : supports
+
+    VALIDATION_FLAG ||--o| REVIEW_DECISION : reviewed_by
+    USER ||--o{ REVIEW_DECISION : reviews
+
+    LECTURE_SESSION ||--o{ RECOMMENDATION : generates
+
+    FACULTY ||--o{ REPORT : owns
+    LECTURE_SESSION ||--o{ REPORT : summarizes
