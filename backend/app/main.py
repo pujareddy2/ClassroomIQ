@@ -15,6 +15,7 @@ from app.api.recommendations import router as recommendations_router
 from app.api.workflow import router as workflow_router
 from app.api.analysis import router as analysis_router
 from app.api.assistant import router as assistant_router
+from app.api.multimedia import router as multimedia_router
 from app.api.contract import install_api_contract
 from app.db import base  # noqa: F401 — imports all models so metadata is populated
 from app.db.init_db import init_db
@@ -72,3 +73,5 @@ app.include_router(explanations_router, prefix="/api/v1", dependencies=_protecte
 app.include_router(workflow_router, prefix="/api/v1", dependencies=_protected)
 app.include_router(analysis_router, prefix="/api/v1", dependencies=_protected)
 app.include_router(assistant_router, prefix="/api/v1", dependencies=_protected)
+app.include_router(multimedia_router, prefix="/api/v1")
+
