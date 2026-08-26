@@ -1,0 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --canvas: 210 40% 98%; --surface: 0 0% 100%; --elevated: 210 40% 96%; --ink: 222 47% 11%; --muted: 215 16% 47%; --line: 214 32% 91%; --brand: 239 84% 67%; --brand-soft: 239 84% 96%; --success: 160 84% 39%; --warning: 38 92% 50%; --danger: 0 84% 60%; --info: 199 89% 48%; }
+.dark { --canvas: 222 47% 7%; --surface: 222 39% 11%; --elevated: 217 33% 17%; --ink: 210 40% 98%; --muted: 215 20% 65%; --line: 217 33% 20%; --brand: 239 84% 72%; --brand-soft: 239 50% 17%; --success: 160 70% 45%; --warning: 38 92% 55%; --danger: 0 78% 63%; --info: 199 82% 55%; }
+@layer base { * { @apply border-line; } html { @apply scroll-smooth; } body { @apply min-h-screen bg-canvas font-sans text-ink antialiased; } button, a, input { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-canvas; } }
+@layer components { .surface { @apply rounded-2xl border border-line bg-surface shadow-soft; } .icon-button { @apply inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted transition hover:bg-elevated hover:text-ink; } .nav-link { @apply flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted transition hover:bg-elevated hover:text-ink; } .nav-link-active { @apply bg-brand-soft text-brand; } }

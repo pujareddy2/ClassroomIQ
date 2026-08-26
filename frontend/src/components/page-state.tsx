@@ -1,0 +1,9 @@
+import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { Button, EmptyState, Skeleton } from './ui'
+import { friendlyError } from '@/hooks/use-api-query'
+import axios from 'axios'
+
+export function LoadingState() { return <div className="grid gap-4 md:grid-cols-3"><Skeleton className="h-28"/><Skeleton className="h-28"/><Skeleton className="h-28"/><Skeleton className="h-64 md:col-span-3"/></div> }
+export function AnalysisProgress({ label }: { label?: string }) { return <div className="surface flex min-h-64 flex-col items-center justify-center p-8 text-center"><div className="h-9 w-9 animate-spin rounded-full border-2 border-brand border-t-transparent"/><h2 className="mt-4 font-semibold">{label ?? 'Checking existing analysis...'}</h2><p className="mt-2 text-sm text-muted">ClassroomIQ is running one stored analysis pipeline and will load results when it completes.</p></div> }
+export function ErrorState({ error, retry }: { error: unknown; retry: () => void }) { const status = axios.isAxiosError(error) ? error.response?.status : undefined; const title = status === 401 ? 'Sign in required' : status === 403 ? 'Access restricted' : status === 404 ? 'Analysis not completed yet' : status === 422 ? 'Information needs attention' : 'Service temporarily unavailable'; return <div className="surface flex min-h-64 flex-col items-center justify-center p-8 text-center"><AlertTriangle className="text-danger"/><h2 className="mt-4 font-semibold">{title}</h2><p className="mt-2 max-w-md text-sm text-muted">{friendlyError(error)}</p>{status !== 401 && <Button className="mt-5" variant="secondary" onClick={retry}><RefreshCw size={16}/>Try again</Button>}</div> }
+export function LectureRequired() { return <EmptyState title="Select or upload a lecture to continue" description="Choose a lecture from the Lectures page or upload a transcript. Coverage, validation, teaching, recommendations, and explainability will update automatically."/> }

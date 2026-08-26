@@ -1,0 +1,7 @@
+import { type ButtonHTMLAttributes, type ReactNode } from 'react'
+import clsx from 'clsx'
+
+export function Button({ className, children, variant = 'primary', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' }) { const styles = { primary: 'bg-brand text-white hover:opacity-90', secondary: 'bg-elevated text-ink hover:bg-line', ghost: 'text-muted hover:bg-elevated hover:text-ink' }; return <button className={clsx('inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50', styles[variant], className)} {...props}>{children}</button> }
+export function Card({ children, className }: { children: ReactNode; className?: string }) { return <section className={clsx('surface p-5', className)}>{children}</section> }
+export function Skeleton({ className }: { className?: string }) { return <div aria-label="Loading" className={clsx('animate-pulse rounded-lg bg-elevated', className)} /> }
+export function EmptyState({ title, description, action }: { title: string; description: string; action?: ReactNode }) { return <div className="surface flex min-h-64 flex-col items-center justify-center p-8 text-center"><div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-xl text-brand">✦</div><h2 className="font-semibold">{title}</h2><p className="mt-2 max-w-sm text-sm text-muted">{description}</p>{action && <div className="mt-5">{action}</div>}</div> }
