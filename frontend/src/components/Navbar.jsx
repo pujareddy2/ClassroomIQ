@@ -43,10 +43,10 @@ export default function Navbar({ activeTab, onTabChange }) {
                 ClassroomIQ
               </span>
               <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', fontWeight: 700, border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-                MODULE 1
+                MEMBER 1 • MODULE 4
               </span>
             </div>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Classroom Capture & Multimedia Intelligence</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Classroom Capture, Audio/Video AI & Lecture Structuring</span>
           </div>
         </div>
 

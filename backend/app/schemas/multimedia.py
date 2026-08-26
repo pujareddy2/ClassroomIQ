@@ -45,6 +45,10 @@ class ChunkUploadResponse(BaseModel):
 class SessionCompleteRequest(BaseModel):
     """Payload to finalize a live recording session."""
     duration_seconds: Optional[float] = Field(default=None, ge=0.0)
+    course_name_or_code: Optional[str] = None
+    faculty_name: Optional[str] = None
+    title: Optional[str] = None
+    classroom: Optional[str] = None
     notes: Optional[str] = None
 
 

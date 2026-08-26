@@ -55,64 +55,75 @@ class CaptureService:
         course_name_or_code: str,
         faculty_name: str,
     ) -> tuple[Course, Faculty]:
-        """Resolves existing course/faculty or creates demo defaults to ensure seamless ingestion."""
+        """Resolves exact course/faculty specified by user or creates new records seamlessly."""
         # 1. Resolve Faculty
+        clean_fac_name = (faculty_name or "Faculty").strip()
         faculty = self.db.query(Faculty).join(Faculty.user).filter(
-            Faculty.user.has(full_name=faculty_name.strip())
+            Faculty.user.has(User.full_name.ilike(clean_fac_name))
         ).first()
 
         if not faculty:
-            # Check for any faculty
-            faculty = self.db.query(Faculty).first()
-
-        if not faculty:
-            # Create a default institution, department, user, and faculty
-            inst = self.db.query(Institution).first()
-            if not inst:
-                inst = Institution(name="Main University", contact_email="admin@classroomiq.ai")
-                self.db.add(inst)
-                self.db.flush()
-
-            dept = self.db.query(Department).first()
-            if not dept:
-                dept = Department(institution_id=inst.id, name="Computer Science", code="CS")
-                self.db.add(dept)
-                self.db.flush()
-
-            user = self.db.query(User).filter(User.email == "faculty@classroomiq.ai").first()
+            user = self.db.query(User).filter(User.full_name.ilike(clean_fac_name)).first()
             if not user:
+                safe_email = f"faculty_{uuid.uuid4().hex[:6]}@classroomiq.ai"
                 user = User(
-                    email="faculty@classroomiq.ai",
-                    full_name=faculty_name or "Dr. Faculty",
+                    email=safe_email,
+                    full_name=clean_fac_name,
                     password_hash="dev_placeholder",
                     role="FACULTY",
                 )
                 self.db.add(user)
                 self.db.flush()
 
+            inst = self.db.query(Institution).first()
+            if not inst:
+                inst = Institution(name="University", contact_email="admin@classroomiq.ai")
+                self.db.add(inst)
+                self.db.flush()
+
+            dept = self.db.query(Department).first()
+            if not dept:
+                dept = Department(institution_id=inst.id, name="General Academics", code="GEN")
+                self.db.add(dept)
+                self.db.flush()
+
             faculty = Faculty(
                 user_id=user.id,
                 department_id=dept.id,
                 employee_id=f"FAC_{uuid.uuid4().hex[:6].upper()}",
-                designation="Assistant Professor",
+                designation="Faculty Member",
             )
             self.db.add(faculty)
             self.db.flush()
 
         # 2. Resolve Course
+        clean_course = (course_name_or_code or "CS101 - General Course").strip()
+        if " - " in clean_course:
+            parts = clean_course.split(" - ", 1)
+            code = parts[0].strip().upper()
+            name = parts[1].strip()
+        else:
+            code = clean_course[:20].strip().upper()
+            name = clean_course.strip()
+
+        # Look up by code or name
         course = self.db.query(Course).filter(
-            (Course.course_code.ilike(course_name_or_code.strip())) |
-            (Course.course_name.ilike(course_name_or_code.strip()))
+            (Course.course_code.ilike(code)) |
+            (Course.course_code.ilike(clean_course)) |
+            (Course.course_name.ilike(name)) |
+            (Course.course_name.ilike(clean_course))
         ).first()
 
-        if not course:
-            course = self.db.query(Course).first()
-
-        if not course:
+        if course:
+            # If course already exists with this code, update name if user gave new title
+            if name and name != code and course.course_name != name:
+                course.course_name = name
+                self.db.flush()
+        else:
             course = Course(
                 department_id=faculty.department_id,
-                course_code=course_name_or_code.strip()[:20].upper() or "CS101",
-                course_name=course_name_or_code.strip() or "Introduction to Computer Science",
+                course_code=code[:20].upper(),
+                course_name=name or code,
                 credits=3,
             )
             self.db.add(course)
@@ -137,7 +148,7 @@ class CaptureService:
             faculty_id=faculty.id,
             lecture_date=date.today(),
             duration_minutes=0,
-            classroom=classroom,
+            classroom=classroom or "Virtual / Recorded",
             status="RECORDING",
         )
         self.db.add(lecture)
@@ -145,18 +156,22 @@ class CaptureService:
 
         recording = Recording(
             session_id=lecture.id,
-            video_path=None,
-            audio_path=None,
             status="RECORDING",
         )
         self.db.add(recording)
         self.db.flush()
 
-        # Initialize storage directory structure
-        self.storage.init_session_dir(lecture.id)
+        # Initialize session storage directories on disk
+        dirs = self.storage.init_session_dir(lecture.id)
         self.db.commit()
 
-        logger.info("Initialized live recording session %s for course %s", lecture.id, course.course_code)
+        logger.info(
+            "Initialized live session %s for course '%s' (faculty: '%s', classroom: '%s')",
+            lecture.id,
+            course.course_name,
+            faculty.user.full_name if faculty.user else "Faculty",
+            classroom,
+        )
 
         return SessionInitResponse(
             session_id=lecture.id,
@@ -167,13 +182,13 @@ class CaptureService:
             complete_session_url=f"/api/v1/multimedia/session/{lecture.id}/complete",
         )
 
-    def save_chunk(
+    def append_live_chunk(
         self,
         session_id: UUID,
         chunk_index: int,
         chunk_bytes: bytes,
     ) -> ChunkUploadResponse:
-        """Saves a stream chunk from the live recorder."""
+        """Saves an incoming WebM/H.264 video chunk to session disk storage."""
         lecture = self.db.get(LectureSession, session_id)
         if not lecture:
             raise ValueError(f"Lecture session {session_id} not found")
@@ -189,16 +204,34 @@ class CaptureService:
             status="CHUNK_RECEIVED",
         )
 
+    # Alias for API compatibility
+    save_chunk = append_live_chunk
+
     def finalize_live_session(
         self,
         session_id: UUID,
         duration_seconds: Optional[float] = None,
+        course_name_or_code: Optional[str] = None,
+        faculty_name: Optional[str] = None,
+        title: Optional[str] = None,
+        classroom: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> SessionCompleteResponse:
-        """Assembles stream chunks, extracts 16kHz WAV, generates keyframes, and marks session ACTIVE."""
+        """Assembles stream chunks, extracts 16kHz WAV, updates session metadata, and marks session ACTIVE."""
         lecture = self.db.get(LectureSession, session_id)
         if not lecture:
             raise ValueError(f"Lecture session {session_id} not found")
+
+        # Update metadata if user updated details during session
+        if course_name_or_code or faculty_name:
+            c_name = course_name_or_code or (lecture.course.course_name if lecture.course else "General Lecture")
+            f_name = faculty_name or (lecture.faculty.user.full_name if (lecture.faculty and lecture.faculty.user) else "Faculty")
+            course, faculty = self._resolve_course_and_faculty(c_name, f_name)
+            lecture.course_id = course.id
+            lecture.faculty_id = faculty.id
+
+        if classroom:
+            lecture.classroom = classroom
 
         recording = self.db.query(Recording).filter(Recording.session_id == session_id).first()
         if not recording:

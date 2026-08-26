@@ -23,7 +23,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -111,8 +111,20 @@ def complete_session(
     service = CaptureService(db)
     try:
         duration = payload.duration_seconds if payload else None
+        c_name = payload.course_name_or_code if payload else None
+        f_name = payload.faculty_name if payload else None
+        classroom = payload.classroom if payload else None
+        title = payload.title if payload else None
         notes = payload.notes if payload else None
-        res = service.finalize_live_session(session_id=session_id, duration_seconds=duration, notes=notes)
+        res = service.finalize_live_session(
+            session_id=session_id,
+            duration_seconds=duration,
+            course_name_or_code=c_name,
+            faculty_name=f_name,
+            title=title,
+            classroom=classroom,
+            notes=notes,
+        )
         return ok(data=res.model_dump(mode="json"), message=res.message, start_ts=start_ts)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -223,13 +235,74 @@ def get_session(
 
 
 @router.get(
+    "/handover-contract/{session_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Member 1 Handover Contract for Member 2 (Academic Intelligence)",
+    description="Delivers the structured multi-modal lecture handover contract containing transcript segments, visual timelines, presentation slides, and synchronized topic chapters.",
+)
+def get_handover_contract(
+    session_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    start_ts = time.time()
+    from app.services.structuring.lecture_structuring_service import LectureStructuringService
+    structuring_service = LectureStructuringService(db=db)
+    try:
+        contract_data = structuring_service.get_structured_lecture(session_id=session_id, db=db)
+        return ok(
+            data=contract_data.model_dump(mode="json"),
+            message="Member 1 Handover Contract retrieved successfully.",
+            start_ts=start_ts,
+        )
+    except Exception as exc:
+        logger.exception("Failed to build Handover Contract for session %s", session_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Handover contract generation failed: {str(exc)}",
+        ) from exc
+
+
+@router.get(
+    "/session/{session_id}/export",
+    summary="Export complete session package JSON",
+    description="Downloads full structured JSON package containing audio transcripts, visual timeline, and multi-track metadata.",
+)
+def export_session_package(
+    session_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+):
+    from app.services.structuring.lecture_structuring_service import LectureStructuringService
+    service = CaptureService(db)
+    detail_data = {}
+    try:
+        detail = service.get_session_detail(session_id)
+        detail_data = detail.model_dump(mode="json")
+    except Exception:
+        detail_data = {"session_id": str(session_id), "status": "ACTIVE"}
+
+    structuring = LectureStructuringService(db=db).get_structured_lecture(session_id=session_id, db=db)
+
+    export_payload = {
+        "metadata": detail_data,
+        "structuring": structuring.model_dump(mode="json"),
+        "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    return JSONResponse(
+        content=export_payload,
+        headers={"Content-Disposition": f'attachment; filename="lecture_session_{session_id}.json"'},
+    )
+
+
+
+@router.get(
     "/session/{session_id}/stream",
-    summary="Stream video or audio file for a session",
-    description="Streams the raw video or normalized 16kHz audio file directly to media players.",
+    summary="Stream video or audio file for a session with Range support",
+    description="Streams the raw video or normalized 16kHz audio file directly to media players with HTTP Range request support.",
 )
 def stream_media(
     session_id: UUID,
     media_type: str = Query("video", pattern="^(video|audio|audio_16k)$"),
+    range_header: Optional[str] = Header(None, alias="Range"),
     db: Annotated[Session, Depends(get_db)] = None,
 ):
     service = CaptureService(db)
@@ -245,6 +318,32 @@ def stream_media(
         ".mp3": "audio/mpeg",
     }
     content_type = media_type_map.get(media_path.suffix.lower(), "application/octet-stream")
+    file_size = media_path.stat().st_size
+
+    if range_header:
+        try:
+            bytes_unit, byte_range = range_header.strip().split("=")
+            if bytes_unit == "bytes":
+                start_str, end_str = byte_range.split("-")
+                start = int(start_str) if start_str else 0
+                end = int(end_str) if end_str else file_size - 1
+                end = min(end, file_size - 1)
+                length = end - start + 1
+
+                with open(media_path, "rb") as f:
+                    f.seek(start)
+                    chunk_data = f.read(length)
+
+                headers = {
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(length),
+                    "Content-Type": content_type,
+                }
+                return Response(content=chunk_data, status_code=206, headers=headers)
+        except Exception as range_err:
+            logger.warning("Range parsing fallback: %s", range_err)
+
     return FileResponse(path=str(media_path), media_type=content_type, filename=media_path.name)
 
 
@@ -283,4 +382,5 @@ def delete_session(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     return ok(data={"session_id": str(session_id), "deleted": True}, message="Session deleted successfully.", start_ts=start_ts)
+
 

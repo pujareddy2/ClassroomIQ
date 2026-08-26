@@ -15,9 +15,11 @@ import {
   Radio,
   Trash2,
   AlertTriangle,
+  Share2,
 } from 'lucide-react';
 import { api } from '../services/api';
 import MediaPreviewModal from './MediaPreviewModal';
+import HandoverContractModal from './HandoverContractModal';
 
 export default function SessionList() {
   const [sessions, setSessions] = useState([]);
@@ -26,6 +28,8 @@ export default function SessionList() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteConfirmSession, setDeleteConfirmSession] = useState(null);
+  const [handoverSessionId, setHandoverSessionId] = useState(null);
+
 
   const fetchSessions = async () => {
     try {
@@ -246,14 +250,38 @@ export default function SessionList() {
                   )}
                 </div>
 
-                <button className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
-                  <Play size={13} fill="currentColor" /> Play
-                </button>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: '0.4rem 0.65rem', fontSize: '0.75rem' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHandoverSessionId(session.session_id);
+                    }}
+                    title="View Member 1 Handover Contract for Member 2"
+                  >
+                    <Share2 size={12} color="var(--accent-primary)" />
+                    Handover
+                  </button>
+
+                  <button className="btn btn-primary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
+                    <Play size={13} fill="currentColor" /> Inspect
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Handover Contract Modal */}
+      {handoverSessionId && (
+        <HandoverContractModal
+          sessionId={handoverSessionId}
+          onClose={() => setHandoverSessionId(null)}
+        />
+      )}
+
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirmSession && (

@@ -281,6 +281,10 @@ export default function LiveRecorder({ onSessionCreated }) {
       setTimeout(async () => {
         const result = await api.completeLiveSession(currentSessionId, {
           duration_seconds: elapsedSeconds,
+          course_name_or_code: courseName,
+          faculty_name: facultyName,
+          title: lectureTitle,
+          classroom,
           notes: 'Captured via Live Classroom Studio',
         });
 

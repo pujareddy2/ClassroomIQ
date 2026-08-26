@@ -149,22 +149,33 @@ class FFmpegProcessor:
         output_audio_path.parent.mkdir(parents=True, exist_ok=True)
 
         if self.has_ffmpeg:
+            # Enhanced command with loudness normalization for quiet or variable-gain microphones
             cmd = [
                 "ffmpeg",
                 "-y",
                 "-i", str(input_media_path),
                 "-vn",  # disable video recording
+                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,highpass=f=80,lowpass=f=7500",  # bandpass & speech normalization
                 "-acodec", "pcm_s16le",
                 "-ar", str(sample_rate),
                 "-ac", "1",  # mono
                 str(output_audio_path),
             ]
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
                 if result.returncode == 0 and output_audio_path.exists():
-                    logger.info("Successfully extracted 16kHz mono audio via FFmpeg: %s", output_audio_path)
+                    logger.info("Successfully extracted normalized 16kHz mono audio via FFmpeg: %s", output_audio_path)
                     return output_audio_path
                 else:
+                    # Fallback to basic extraction without audio filters if filter unsupported
+                    basic_cmd = [
+                        "ffmpeg", "-y", "-i", str(input_media_path), "-vn",
+                        "-acodec", "pcm_s16le", "-ar", str(sample_rate), "-ac", "1",
+                        str(output_audio_path),
+                    ]
+                    sub_res = subprocess.run(basic_cmd, capture_output=True, text=True, timeout=120)
+                    if sub_res.returncode == 0 and output_audio_path.exists():
+                        return output_audio_path
                     logger.warning("FFmpeg extraction returned code %d: %s", result.returncode, result.stderr)
             except Exception as exc:
                 logger.warning("FFmpeg extraction failed: %s", exc)

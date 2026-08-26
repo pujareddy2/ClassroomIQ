@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Play,
@@ -13,13 +13,25 @@ import {
   Download,
   Info,
   Trash2,
+  MessageSquare,
+  Video,
+  Share2,
 } from 'lucide-react';
 import { api } from '../services/api';
+import TranscriptViewer from './TranscriptViewer';
+import VisualTimelineViewer from './VisualTimelineViewer';
+import LectureStructureViewer from './LectureStructureViewer';
+import HandoverContractModal from './HandoverContractModal';
 
 export default function MediaPreviewModal({ session, onClose, onDelete }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('structure'); // 'structure' | 'visual' | 'transcript' | 'slides'
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
+
+  const videoRef = useRef(null);
+  const audioRef = useRef(null);
 
   useEffect(() => {
     async function loadDetail() {
@@ -42,6 +54,16 @@ export default function MediaPreviewModal({ session, onClose, onDelete }) {
   const slides = detail?.slides || [];
   const meta = detail?.media_metadata;
 
+  const handleSeekToTimestamp = (seconds) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = seconds;
+      videoRef.current.play().catch(() => null);
+    } else if (audioRef.current) {
+      audioRef.current.currentTime = seconds;
+      audioRef.current.play().catch(() => null);
+    }
+  };
+
   return (
     <div
       style={{
@@ -50,7 +72,7 @@ export default function MediaPreviewModal({ session, onClose, onDelete }) {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(5, 8, 15, 0.85)',
+        background: 'rgba(5, 8, 15, 0.88)',
         backdropFilter: 'blur(16px)',
         zIndex: 100,
         display: 'flex',
@@ -62,9 +84,9 @@ export default function MediaPreviewModal({ session, onClose, onDelete }) {
       <div
         className="glass-card"
         style={{
-          width: '1000px',
-          maxWidth: '95vw',
-          maxHeight: '90vh',
+          width: '1100px',
+          maxWidth: '96vw',
+          maxHeight: '92vh',
           overflowY: 'auto',
           background: 'var(--bg-secondary)',
           borderRadius: 'var(--radius-xl)',
@@ -91,6 +113,15 @@ export default function MediaPreviewModal({ session, onClose, onDelete }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+              onClick={() => setShowHandoverModal(true)}
+              title="View Member 1 Handover Contract for Member 2"
+            >
+              <Share2 size={14} color="var(--accent-primary)" /> Member 2 Handover
+            </button>
+
             {onDelete && (
               <button
                 className="btn btn-danger"
@@ -122,11 +153,20 @@ export default function MediaPreviewModal({ session, onClose, onDelete }) {
           </div>
         </div>
 
-        {/* Media Player + Slide Viewer Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: slides.length > 0 ? '1.2fr 1fr' : '1fr', gap: '1.5rem' }}>
-          {/* Media Player */}
+        {/* Handover Contract Modal */}
+        {showHandoverModal && (
+          <HandoverContractModal
+            sessionId={session.session_id}
+            onClose={() => setShowHandoverModal(false)}
+          />
+        )}
+
+
+        {/* Top Media Player */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+          {/* Media Player Column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Lecture Stream</h4>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Lecture Media Stream</h4>
             <div
               style={{
                 borderRadius: 'var(--radius-lg)',
@@ -141,116 +181,161 @@ export default function MediaPreviewModal({ session, onClose, onDelete }) {
             >
               {session.has_video ? (
                 <video
+                  ref={videoRef}
                   controls
-                  style={{ width: '100%', maxHeight: '340px' }}
+                  style={{ width: '100%', maxHeight: '300px' }}
                   src={api.getStreamUrl(session.session_id, 'video')}
                 />
               ) : session.has_audio ? (
                 <div style={{ padding: '2rem', textAlign: 'center', width: '100%' }}>
                   <Volume2 size={40} color="var(--accent-primary)" style={{ margin: '0 auto 1rem' }} />
                   <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>Audio Lecture Recording</p>
-                  <audio controls style={{ width: '100%' }} src={api.getStreamUrl(session.session_id, 'audio_16k')} />
+                  <audio ref={audioRef} controls style={{ width: '100%' }} src={api.getStreamUrl(session.session_id, 'audio_16k')} />
                 </div>
               ) : (
                 <p style={{ color: 'var(--text-muted)' }}>No media file available</p>
               )}
             </div>
+
+            {/* Technical Specs Summary */}
+            <div style={{ background: 'var(--bg-tertiary)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+              <div>Format: <strong style={{ color: 'var(--text-primary)' }}>{meta?.format || 'webm/wav'}</strong></div>
+              <div>Duration: <strong style={{ color: 'var(--text-primary)' }}>{meta?.duration_seconds ? `${Math.round(meta.duration_seconds)}s` : 'N/A'}</strong></div>
+              <div>Sample Rate: <strong style={{ color: 'var(--text-primary)' }}>16,000 Hz (Mono WAV)</strong></div>
+              <div>Whisper Ready: <strong style={{ color: 'var(--accent-emerald)' }}>✓ Normalized</strong></div>
+            </div>
           </div>
 
-          {/* Slide Gallery (if available) */}
-          {slides.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                  Slide Deck ({activeSlideIndex + 1} of {slides.length})
-                </h4>
-                <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ padding: '0.25rem 0.5rem' }}
-                    disabled={activeSlideIndex === 0}
-                    onClick={() => setActiveSlideIndex((prev) => prev - 1)}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ padding: '0.25rem 0.5rem' }}
-                    disabled={activeSlideIndex === slides.length - 1}
-                    onClick={() => setActiveSlideIndex((prev) => prev + 1)}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
+          {/* Right Column: Tab View (Structure vs Visual Timeline vs Transcript vs Slides) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {/* Tab Header */}
+            <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-tertiary)', padding: '0.3rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <button
+                className="btn"
+                style={{
+                  flex: 1,
+                  padding: '0.4rem',
+                  fontSize: '0.82rem',
+                  background: activeTab === 'structure' ? 'linear-gradient(135deg, var(--accent-primary) 0%, #a855f7 100%)' : 'transparent',
+                  color: activeTab === 'structure' ? '#ffffff' : 'var(--text-secondary)',
+                }}
+                onClick={() => setActiveTab('structure')}
+              >
+                <Layers size={14} /> Structure & Sync
+              </button>
+
+              <button
+                className="btn"
+                style={{
+                  flex: 1,
+                  padding: '0.4rem',
+                  fontSize: '0.82rem',
+                  background: activeTab === 'visual' ? 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)' : 'transparent',
+                  color: activeTab === 'visual' ? '#ffffff' : 'var(--text-secondary)',
+                }}
+                onClick={() => setActiveTab('visual')}
+              >
+                <Video size={14} /> Video
+              </button>
+
+              <button
+                className="btn"
+                style={{
+                  flex: 1,
+                  padding: '0.4rem',
+                  fontSize: '0.82rem',
+                  background: activeTab === 'transcript' ? 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)' : 'transparent',
+                  color: activeTab === 'transcript' ? '#ffffff' : 'var(--text-secondary)',
+                }}
+                onClick={() => setActiveTab('transcript')}
+              >
+                <MessageSquare size={14} /> Speech
+              </button>
+
+              {slides.length > 0 && (
+                <button
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    padding: '0.4rem',
+                    fontSize: '0.82rem',
+                    background: activeTab === 'slides' ? 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)' : 'transparent',
+                    color: activeTab === 'slides' ? '#ffffff' : 'var(--text-secondary)',
+                  }}
+                  onClick={() => setActiveTab('slides')}
+                >
+                  <FileText size={14} /> Slides ({slides.length})
+                </button>
+              )}
+            </div>
+
+            {/* Tab Body */}
+            {activeTab === 'structure' ? (
+              <LectureStructureViewer sessionId={session.session_id} onSeekToTimestamp={handleSeekToTimestamp} />
+            ) : activeTab === 'visual' ? (
+              <VisualTimelineViewer sessionId={session.session_id} onSeekToTimestamp={handleSeekToTimestamp} />
+            ) : activeTab === 'transcript' ? (
+              <TranscriptViewer sessionId={session.session_id} onSeekToTimestamp={handleSeekToTimestamp} />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Slide Deck ({activeSlideIndex + 1} of {slides.length})
+                  </h4>
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.5rem' }}
+                      disabled={activeSlideIndex === 0}
+                      onClick={() => setActiveSlideIndex((prev) => prev - 1)}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.5rem' }}
+                      disabled={activeSlideIndex === slides.length - 1}
+                      onClick={() => setActiveSlideIndex((prev) => prev + 1)}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    borderRadius: 'var(--radius-lg)',
+                    overflow: 'hidden',
+                    background: '#0c101b',
+                    border: '1px solid var(--border-subtle)',
+                    height: '350px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                  }}
+                >
+                  {slides[activeSlideIndex]?.preview_url ? (
+                    <img
+                      src={slides[activeSlideIndex].preview_url}
+                      alt={`Slide ${activeSlideIndex + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                      <FileText size={36} color="var(--accent-secondary)" style={{ margin: '0 auto 0.75rem' }} />
+                      <p style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+                        {slides[activeSlideIndex]?.title || `Slide ${activeSlideIndex + 1}`}
+                      </p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxHeight: '140px', overflowY: 'auto' }}>
+                        {slides[activeSlideIndex]?.text_content || 'Text extracted from PPTX'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              <div
-                style={{
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden',
-                  background: '#0c101b',
-                  border: '1px solid var(--border-subtle)',
-                  height: '340px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                }}
-              >
-                {slides[activeSlideIndex]?.preview_url ? (
-                  <img
-                    src={slides[activeSlideIndex].preview_url}
-                    alt={`Slide ${activeSlideIndex + 1}`}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                  />
-                ) : (
-                  <div style={{ padding: '1.5rem', textAlign: 'center' }}>
-                    <FileText size={36} color="var(--accent-secondary)" style={{ margin: '0 auto 0.75rem' }} />
-                    <p style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.5rem' }}>
-                      {slides[activeSlideIndex]?.title || `Slide ${activeSlideIndex + 1}`}
-                    </p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxHeight: '140px', overflowY: 'auto' }}>
-                      {slides[activeSlideIndex]?.text_content || 'Text extracted from PPTX'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Technical Metadata & AI Pipeline Readiness Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
-          {/* Metadata Card */}
-          <div style={{ background: 'var(--bg-tertiary)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <h5 style={{ fontSize: '0.82rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-              Media Technical Specs (FFmpeg Probe)
-            </h5>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
-              <div>Format: <strong style={{ color: 'var(--text-primary)' }}>{meta?.format || 'webm'}</strong></div>
-              <div>Duration: <strong style={{ color: 'var(--text-primary)' }}>{meta?.duration_seconds ? `${Math.round(meta.duration_seconds)}s` : 'N/A'}</strong></div>
-              <div>Sample Rate: <strong style={{ color: 'var(--text-primary)' }}>{meta?.sample_rate ? `${meta.sample_rate} Hz` : '16000 Hz (Normalized)'}</strong></div>
-              <div>Resolution: <strong style={{ color: 'var(--text-primary)' }}>{meta?.width ? `${meta.width}x${meta.height}` : 'N/A'}</strong></div>
-            </div>
-          </div>
-
-          {/* AI Intelligence Readiness Card */}
-          <div style={{ background: 'rgba(99, 102, 241, 0.08)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-            <h5 style={{ fontSize: '0.82rem', textTransform: 'uppercase', color: 'var(--accent-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Sparkles size={14} /> AI Intelligence Pipeline Readiness
-            </h5>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)' }}>
-                <CheckCircle2 size={13} /> 16kHz Mono WAV Extracted (Ready for Whisper STT)
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)' }}>
-                <CheckCircle2 size={13} /> Video Keyframes Stitched (Ready for OpenCV / YOLO)
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)' }}>
-                <CheckCircle2 size={13} /> Structured for POST /api/v1/lecture/analyze
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
