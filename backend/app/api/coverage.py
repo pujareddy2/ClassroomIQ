@@ -159,6 +159,11 @@ def get_coverage_timeline(
 
 
 @router.get(
+    "/{lecture_id}",
+    response_model=CoverageSummaryResponse,
+    status_code=status.HTTP_200_OK,
+)
+@router.get(
     "/{lecture_id}/summary",
     response_model=CoverageSummaryResponse,
     status_code=status.HTTP_200_OK,

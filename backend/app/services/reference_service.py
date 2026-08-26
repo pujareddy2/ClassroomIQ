@@ -105,25 +105,30 @@ class ReferenceService:
             self.repository.db.rollback()
             raise
 
-        # ── Extract text (non-fatal) ───────────────────────────────────────
+        # ── Extract text & RAG index (non-fatal) ─────────────────────────
         extracted_text: str | None = None
         extraction_metadata: dict[str, Any] | None = None
         try:
             extraction_service = DocumentExtractionService(self.repository.db)
             extracted = extraction_service.extract_text_from_path(saved_path)
-            # Only update processing_status — avoid touching missing ORM columns
             created.processing_status = "TEXT_EXTRACTED"
             self.repository.db.add(created)
             self.repository.db.flush()
             extracted_text = extracted.text
             extraction_metadata = extracted.metadata
+
+            # Trigger RAG Indexing (Semantic Chunking + Embeddings + PostgreSQL Store)
+            from app.services.rag.rag_retrieval_service import RAGRetrievalService
+            rag_service = RAGRetrievalService(self.repository.db)
+            res = rag_service.index_reference_material(created.id)
+            chunk_count = res.chunks_created if hasattr(res, "chunks_created") else 0
+            logger.info("Auto-indexed reference document '%s' with %d RAG chunks.", created.id, chunk_count)
         except Exception as exc:
-            logger.warning("Text extraction failed for reference material: %s", exc)
-            # Non-fatal — record stays in UPLOADED status
+            logger.warning("Text extraction / RAG indexing failed for reference material: %s", exc)
 
         response = ReferenceUploadResponse(
             status="success",
-            message="Reference material uploaded successfully",
+            message="Reference material uploaded and RAG indexed successfully",
             document_id=created.id,
             course_id=created.course_id,
             processing_status=created.processing_status,

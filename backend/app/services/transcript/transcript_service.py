@@ -67,7 +67,7 @@ class TranscriptService:
         # ── Step 2 & 3: Resolve / Create Lecture Session ──────────────────────
         lecture: LectureSession | None = None
         if lecture_id is not None:
-            lecture = self.db.get(LectureSession, lecture_id)
+            lecture = self.db.get(LectureSession, UUID(str(lecture_id)))
 
         if lecture is None:
             # Resolve faculty and course

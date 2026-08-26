@@ -110,10 +110,11 @@ def _stage(db: Session, job: AnalysisJob, name: str, progress: int, action) -> N
     db.commit()
 
 
-def _load_chunks(db: Session, lecture_id: UUID) -> list[dict]:
-    rows = db.execute(select(TranscriptChunk).join(Transcript, TranscriptChunk.transcript_id == Transcript.id).where(Transcript.lecture_id == lecture_id).order_by(TranscriptChunk.chunk_index)).scalars().all()
-    mappings = {mapping.chunk_id: mapping.topic_id for mapping in db.execute(select(TranscriptTopicMapping).where(TranscriptTopicMapping.lecture_id == lecture_id)).scalars()}
-    return [{"chunk_id": str(chunk.id), "topic_id": mappings.get(chunk.id), "speaker": chunk.speaker or "Faculty", "start_time": chunk.start_time, "end_time": chunk.end_time, "text": chunk.text} for chunk in rows]
+def _load_chunks(db: Session, lecture_id: UUID | str) -> list[dict]:
+    lec_id_obj = UUID(str(lecture_id))
+    rows = db.execute(select(TranscriptChunk).join(Transcript, TranscriptChunk.transcript_id == Transcript.id).where(Transcript.lecture_id == lec_id_obj).order_by(TranscriptChunk.chunk_index)).scalars().all()
+    mappings = {mapping.chunk_id: mapping.topic_id for mapping in db.execute(select(TranscriptTopicMapping).where(TranscriptTopicMapping.lecture_id == lec_id_obj)).scalars()}
+    return [{"chunk_id": str(chunk.id), "topic_id": str(mappings[chunk.id]) if mappings.get(chunk.id) else None, "speaker": chunk.speaker or "Faculty", "start_time": chunk.start_time, "end_time": chunk.end_time, "text": chunk.text} for chunk in rows]
 
 
 def _assert_persisted(db: Session, lecture_id: UUID) -> None:

@@ -7,6 +7,7 @@ from app.models.academic_term import AcademicTerm
 from app.models.curriculum import Curriculum
 from app.models.topic import Topic
 from app.models.reference_material import ReferenceMaterial
+from app.models.reference_chunk import ReferenceChunk
 from app.models.topic_reference import TopicReference
 from app.models.lecture_session import LectureSession
 from app.models.recording import Recording
@@ -14,10 +15,8 @@ from app.models.transcript import Transcript
 from app.models.transcript_segment import TranscriptSegment
 from app.models.transcript_chunk import TranscriptChunk
 from app.models.transcript_topic_mapping import TranscriptTopicMapping
-from app.models.coverage_report import CoverageReport
 from app.models.validation_flag import ValidationFlag
 from app.models.review_decision import ReviewDecision
-from app.models.recommendation import Recommendation
 from app.models.report import Report
 from app.models.validation_result import ValidationResult
 from app.models.validation_evidence import ValidationEvidence
@@ -65,6 +64,7 @@ __all__ = [
     "Curriculum",
     "Topic",
     "ReferenceMaterial",
+    "ReferenceChunk",
     "TopicReference",
     "LectureSession",
     "Recording",
@@ -72,10 +72,8 @@ __all__ = [
     "TranscriptSegment",
     "TranscriptChunk",
     "TranscriptTopicMapping",
-    "CoverageReport",
     "ValidationFlag",
     "ReviewDecision",
-    "Recommendation",
     "Report",
     "ValidationResult",
     "ValidationEvidence",

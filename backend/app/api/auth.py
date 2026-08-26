@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,7 +14,12 @@ from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserP
 from app.services.auth_service import login_user, register_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+bearer_scheme = HTTPBearer(
+    scheme_name="BearerAuth",
+    description="Enter your JWT access token (obtained from /api/v1/auth/login).",
+    auto_error=False,
+)
 
 
 @router.post("/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
@@ -27,7 +32,10 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> UserPub
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(
+    payload: LoginRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
     try:
         return login_user(db=db, payload=payload)
     except ValueError as exc:
@@ -40,11 +48,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Bearer token missing.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_val = credentials.credentials
     try:
-        payload = decode_token(token)
+        payload = decode_token(token_val)
         subject = payload.get("sub")
         if not subject:
             raise HTTPException(

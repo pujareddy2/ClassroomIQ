@@ -38,6 +38,31 @@ class ReferenceRetriever:
         """
         results: List[Tuple[Optional[UUID], str, str, str]] = []
 
+        curriculum = self.db.get(Curriculum, curriculum_id) if curriculum_id else None
+        course_id = curriculum.course_id if curriculum else None
+
+        # 0. Primary Source: Query RAG Retrieval Service for indexed reference chunks
+        if course_id is not None and (topic_name or topic_id):
+            try:
+                from app.services.rag.rag_retrieval_service import RAGRetrievalService
+                rag_service = RAGRetrievalService(self.db)
+                bundle = rag_service.retrieve_evidence(
+                    query=topic_name or "Academic Concept",
+                    course_id=course_id,
+                    topic_id=topic_id,
+                    top_k=5,
+                )
+                if bundle and bundle.evidence:
+                    for item in bundle.evidence:
+                        results.append((
+                            item.reference_material_id,
+                            item.document_title,
+                            item.section_title or f"Section: {topic_name or 'Topic'}",
+                            item.chunk_text,
+                        ))
+            except Exception as exc:
+                logger.warning("RAG retrieval lookup in ReferenceRetriever encountered error: %s", exc)
+
         # 1. Fetch from topic_references table if topic_id is provided
         if topic_id:
             stmt = (

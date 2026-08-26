@@ -452,7 +452,10 @@ class CoverageService:
         )
         timelines = self.db.execute(stmt).scalars().all()
         if not timelines:
-            raise LectureNotFoundError(f"No coverage timeline records found for lecture '{lecture_id}'")
+            summary = self.db.query(CoverageSummary).filter(CoverageSummary.lecture_id == lecture_id).first()
+            if not summary:
+                raise LectureNotFoundError(f"No coverage timeline records found for lecture '{lecture_id}'")
+            return {"lecture_id": str(lecture_id), "intervals": [], "total_intervals": 0}
 
         intervals = [
             {

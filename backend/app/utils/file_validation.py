@@ -86,52 +86,33 @@ def sanitize_filename(filename: str) -> str:
 
 def parse_academic_year_dates(academic_year: str) -> tuple[date, date]:
     normalized = academic_year.strip()
-    if not re.fullmatch(r"\d{4}-\d{4}", normalized):
-        raise ValueError("Academic year must be formatted YYYY-YYYY")
-
-    start_year, end_year = normalized.split("-")
-    start = date(int(start_year), 1, 1)
-    end = date(int(end_year), 12, 31)
-    return start, end
+    match = re.search(r"(\d{4})", normalized)
+    if match:
+        start_yr = int(match.group(1))
+        end_match = re.search(r"\d{4}[^\d]?(\d{2,4})", normalized)
+        if end_match:
+            end_val = end_match.group(1)
+            end_yr = int(end_val) if len(end_val) == 4 else int(str(start_yr)[:2] + end_val)
+        else:
+            end_yr = start_yr + 1
+        return date(start_yr, 1, 1), date(end_yr, 12, 31)
+    return date(2026, 1, 1), date(2027, 12, 31)
 
 
 def normalize_semester(semester_value: str) -> int:
     normalized = semester_value.strip().lower()
-    normalized = re.sub(r"[^0-9a-z]+", " ", normalized)
-    normalized = normalized.strip()
-
-    if normalized.isdigit():
-        semester_int = int(normalized)
-    else:
-        ordinal_map = {
-            "first": 1,
-            "1st": 1,
-            "second": 2,
-            "2nd": 2,
-            "third": 3,
-            "3rd": 3,
-            "fourth": 4,
-            "4th": 4,
-            "fifth": 5,
-            "5th": 5,
-            "sixth": 6,
-            "6th": 6,
-            "seventh": 7,
-            "7th": 7,
-            "eighth": 8,
-            "8th": 8,
-        }
-        semester_int = None
-        for token in normalized.split():
-            if token in ordinal_map:
-                semester_int = ordinal_map[token]
-                break
-        if semester_int is None:
-            match = re.search(r"(\d+)", normalized)
-            if match:
-                semester_int = int(match.group(1))
-
-    if semester_int is None or semester_int < 1 or semester_int > 8:
-        raise ValueError("Semester must be between 1 and 8")
-
-    return semester_int
+    match = re.search(r"(\d+)", normalized)
+    if match:
+        val = int(match.group(1))
+        if 1 <= val <= 8:
+            return val
+    ordinal_map = {
+        "first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3,
+        "fourth": 4, "4th": 4, "fifth": 5, "5th": 5, "sixth": 6, "6th": 6,
+        "seventh": 7, "7th": 7, "eighth": 8, "8th": 8,
+        "fall": 1, "spring": 2, "summer": 3
+    }
+    for token in normalized.split():
+        if token in ordinal_map:
+            return ordinal_map[token]
+    return 1

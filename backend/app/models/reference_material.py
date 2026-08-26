@@ -35,3 +35,4 @@ class ReferenceMaterial(Base):
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="reference_materials")
     topic_references: Mapped[List["TopicReference"]] = relationship("TopicReference", back_populates="reference_material", cascade="all, delete-orphan")
     validation_flags: Mapped[List["ValidationFlag"]] = relationship("ValidationFlag", back_populates="reference_material")
+    chunks: Mapped[List["ReferenceChunk"]] = relationship("ReferenceChunk", back_populates="reference_material", cascade="all, delete-orphan")

@@ -12,7 +12,7 @@ ProcessingStatus = Literal["UPLOADED", "VALIDATED", "TEXT_EXTRACTED", "PARSED", 
 
 class CurriculumUploadMetadata(BaseModel):
     course_name: str = Field(min_length=2, max_length=255)
-    academic_year: str = Field(min_length=9, max_length=9, pattern=r"^\d{4}-\d{4}$")
+    academic_year: str = Field(min_length=4, max_length=50)
     semester: str = Field(min_length=1, max_length=50)
     faculty_name: str = Field(min_length=2, max_length=255)
     title: str = Field(min_length=2, max_length=255)

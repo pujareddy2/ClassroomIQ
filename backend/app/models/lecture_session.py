@@ -14,6 +14,7 @@ class LectureSession(Base):
     lecture_date: Mapped[date] = mapped_column(Date, nullable=False)
     duration_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
     classroom: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Audit & Soft Delete Columns
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
@@ -26,6 +27,4 @@ class LectureSession(Base):
     course: Mapped["Course"] = relationship("Course", back_populates="lecture_sessions")
     faculty: Mapped["Faculty"] = relationship("Faculty", back_populates="lecture_sessions")
     recording: Mapped[Optional["Recording"]] = relationship("Recording", back_populates="lecture_session", cascade="all, delete-orphan")
-    coverage_report: Mapped[Optional["CoverageReport"]] = relationship("CoverageReport", back_populates="lecture_session", cascade="all, delete-orphan")
-    recommendations: Mapped[List["Recommendation"]] = relationship("Recommendation", back_populates="lecture_session", cascade="all, delete-orphan")
     reports: Mapped[List["Report"]] = relationship("Report", back_populates="lecture_session")

@@ -402,19 +402,19 @@ class TeachingService:
 
         inst = self.db.execute(select(Institution)).scalars().first()
         if not inst:
-            inst = Institution(name="Default Institution", code="DEF", type="UNIVERSITY")
+            inst = Institution(name="Default Institution", contact_email=f"def_{str(lecture_id)[:6]}@sample.edu")
             self.db.add(inst)
             self.db.flush()
 
         dept = self.db.execute(select(Department)).scalars().first()
         if not dept:
-            dept = Department(institution_id=inst.id, name="Computer Science", code="CS")
+            dept = Department(institution_id=inst.id, name="Computer Science", code=f"CS_{str(lecture_id)[:6]}")
             self.db.add(dept)
             self.db.flush()
 
         usr = self.db.execute(select(User)).scalars().first()
         if not usr:
-            usr = User(email="faculty@example.com", full_name="Faculty User", hashed_password="pw", role="FACULTY")
+            usr = User(email=f"faculty_{str(lecture_id)[:6]}@example.com", full_name="Faculty User", password_hash="pw", role="FACULTY")
             self.db.add(usr)
             self.db.flush()
 

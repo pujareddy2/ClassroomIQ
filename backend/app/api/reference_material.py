@@ -6,13 +6,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-import logging
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.reference_material import ReferenceUploadMetadata, ReferenceUploadResponse
-from app.schemas.response import created
+from app.schemas.response import created, ok
 from app.services.reference_service import ReferenceService
 from app.utils.file_validation import (
     FileTooLargeError,
@@ -20,6 +19,8 @@ from app.utils.file_validation import (
     MissingMetadataError,
     UnsupportedFileTypeError,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reference", tags=["Reference Material"])
 
@@ -70,6 +71,59 @@ async def upload_reference_material(
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except Exception as exc:
-        logger = logging.getLogger(__name__)
         logger.exception("Unexpected error during reference material upload")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+
+@router.get(
+    "/list",
+    summary="List reference materials",
+    description="Returns list of uploaded reference materials.",
+)
+def list_reference_materials(
+    db: Annotated[Session, Depends(get_db)],
+    course_id: UUID | None = None,
+) -> dict:
+    from app.models.reference_material import ReferenceMaterial
+    query = db.query(ReferenceMaterial).filter(ReferenceMaterial.deleted_at.is_(None))
+    if course_id:
+        query = query.filter(ReferenceMaterial.course_id == course_id)
+    items = query.all()
+    results = [
+        {
+            "id": str(m.id),
+            "course_id": str(m.course_id),
+            "title": m.title,
+            "document_type": m.document_type,
+            "file_name": m.file_name,
+            "file_size": m.file_size,
+            "processing_status": m.processing_status,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in items
+    ]
+    return ok(data=results, message="Reference materials retrieved.")
+
+
+@router.delete(
+    "/{reference_id}",
+    summary="Delete reference material",
+    description="Soft deletes a reference material.",
+)
+def delete_reference_material(
+    reference_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    from app.repositories.reference_repository import ReferenceRepository
+    from app.models.reference_material import ReferenceMaterial
+    repo = ReferenceRepository(db)
+    ref = repo.soft_delete_reference(reference_id)
+    if ref is None:
+        item = db.get(ReferenceMaterial, reference_id)
+        if item:
+            item.deleted_at = datetime.now(timezone.utc)
+            db.commit()
+            return ok(data={"id": str(reference_id)}, message="Reference material deleted.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reference material not found.")
+    db.commit()
+    return ok(data={"id": str(reference_id)}, message="Reference material deleted.")

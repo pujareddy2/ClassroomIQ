@@ -83,6 +83,9 @@ def create_tables(bind: Engine = engine) -> None:
     logger.info("Creating database tables (if they do not already exist)…")
     try:
         Base.metadata.create_all(bind=bind)
+        with bind.begin() as conn:
+            from sqlalchemy import text
+            conn.execute(text("ALTER TABLE reference_chunks ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64);"))
         table_names = list(Base.metadata.tables.keys())
         logger.info(
             "Database ready. %d table(s) registered: %s",

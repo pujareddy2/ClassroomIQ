@@ -32,20 +32,46 @@ class CitationService:
         evidence_item_id: UUID,
         topic_name: str,
         curriculum_id: Optional[UUID] = None,
+        course_id: Optional[UUID] = None,
     ) -> ReferenceCitation:
         """
-        Query DB reference materials for a verified academic citation.
+        Query RAG Retrieval Service for a verified academic citation.
 
         Search priority:
-          1. PROCESSED references for the curriculum (if curriculum_id provided).
-          2. Any PROCESSED reference material.
-          3. Fallback 'Reference Not Available' sentinel.
+          1. RAGRetrievalService query for topic_name within course_id/curriculum_id.
+          2. Fallback 'Reference Not Available' sentinel.
         """
         logger.info("Reference Citation Loaded — topic=%s", topic_name)
 
+        # 1. High Priority: Query RAG Retrieval Service for semantic reference chunk
+        try:
+            from app.services.rag.rag_retrieval_service import RAGRetrievalService
+            rag_service = RAGRetrievalService(self.db)
+            bundle = rag_service.retrieve_evidence(
+                query=topic_name or "Academic Concept",
+                course_id=course_id,
+                top_k=3,
+            )
+            if bundle and bundle.evidence and bundle.total_results > 0:
+                top_item = bundle.evidence[0]
+                if top_item.final_score >= 0.15:
+                    return ReferenceCitation(
+                        evidence_item_id=evidence_item_id,
+                        reference_material_id=top_item.reference_material_id,
+                        document_name=top_item.document_title,
+                        document_type="REFERENCE_BOOK",
+                        chapter=f"Chapter on {topic_name}",
+                        section=top_item.section_title or f"Section: {topic_name}",
+                        page_number=top_item.page_number,
+                        excerpt=top_item.chunk_text,
+                        citation_confidence=round(top_item.final_score * 100, 1),
+                    )
+        except Exception as exc:
+            logger.warning("RAG retrieval failed in CitationService: %s", exc)
+
         ref = None
 
-        # Priority 1: curriculum-scoped processed reference
+        # Priority 2: curriculum-scoped processed reference
         if curriculum_id is not None:
             ref = (
                 self.db.query(ReferenceMaterial)
