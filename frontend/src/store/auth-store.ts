@@ -10,7 +10,9 @@ export type CurrentUser = {
   institution?: string
   department?: string
   designation?: string
+  profile_image_url?: string
   profileCompleted?: boolean
+  profile_completed?: boolean
 }
 
 type AuthState = {

@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Boolean, TIMESTAMP, text, ForeignKey
+from sqlalchemy import String, Boolean, TIMESTAMP, text, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
@@ -14,6 +14,13 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("TRUE"), nullable=False)
+
+    # Profile Fields (persisted in DB)
+    profile_completed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("FALSE"), nullable=False)
+    institution: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    designation: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    profile_image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Audit & Soft Delete Columns
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)

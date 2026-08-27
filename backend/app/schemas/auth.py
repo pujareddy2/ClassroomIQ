@@ -32,9 +32,22 @@ class UserPublic(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
+    profile_completed: bool = False
+    institution: str | None = None
+    department: str | None = None
+    designation: str | None = None
+    profile_image_url: str | None = None
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserPublic
+
+
+class UpdateProfileRequest(BaseModel):
+    full_name: str | None = None
+    institution: str | None = None
+    department: str | None = None
+    designation: str | None = None
+    profile_image_url: str | None = None

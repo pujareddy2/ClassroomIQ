@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BrainCircuit, Upload, Trash2, User, Building, BookOpen, GraduationCap, ArrowRight, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth-store'
 import { Button } from '@/components/ui'
+import { api, unwrap } from '@/services/api/client'
 
 export function ProfileSetupPage() {
   const navigate = useNavigate()
@@ -58,7 +59,7 @@ export function ProfileSetupPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!fullName.trim()) {
       setErrorMsg('Full Name is required.')
@@ -80,19 +81,35 @@ export function ProfileSetupPage() {
     setErrorMsg(null)
     setIsSubmitting(true)
 
-    // Simulate saving profile and updating auth state
-    setTimeout(() => {
+    try {
+      // Save profile permanently to the database
+      const saved = await unwrap<Record<string, unknown>>(
+        await api.patch('/auth/profile', {
+          full_name: fullName.trim(),
+          institution: institution.trim(),
+          department: department.trim(),
+          designation,
+          profile_image_url: profileImage || null,
+        })
+      )
+
+      // Update local auth state with server response
       updateUserProfile({
-        full_name: fullName.trim(),
-        institution: institution.trim(),
-        department: department.trim(),
-        designation,
-        profileImage,
-        profileCompleted: true
+        full_name: (saved.full_name as string) || fullName.trim(),
+        institution: (saved.institution as string) || institution.trim(),
+        department: (saved.department as string) || department.trim(),
+        designation: (saved.designation as string) || designation,
+        profileImage: profileImage,
+        profileCompleted: true,
       })
-      setIsSubmitting(false)
+
       navigate('/dashboard', { replace: true })
-    }, 400)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save profile. Please try again.'
+      setErrorMsg(errorMessage)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (

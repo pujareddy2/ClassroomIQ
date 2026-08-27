@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserPublic
+from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserPublic, UpdateProfileRequest
 from app.services.auth_service import login_user, register_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -92,4 +92,31 @@ def get_current_user(
 
 @router.get("/me", response_model=UserPublic)
 def me(current_user: User = Depends(get_current_user)) -> UserPublic:
+    return UserPublic.model_validate(current_user)
+
+
+@router.patch("/profile", response_model=UserPublic)
+def update_profile(
+    payload: UpdateProfileRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserPublic:
+    """Persist faculty profile details (institution, department, designation) to the database."""
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name.strip()
+    if payload.institution is not None:
+        current_user.institution = payload.institution.strip()
+    if payload.department is not None:
+        current_user.department = payload.department.strip()
+    if payload.designation is not None:
+        current_user.designation = payload.designation.strip()
+    if payload.profile_image_url is not None:
+        current_user.profile_image_url = payload.profile_image_url
+
+    # Mark profile as permanently completed
+    current_user.profile_completed = True
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     return UserPublic.model_validate(current_user)

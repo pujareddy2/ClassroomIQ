@@ -17,9 +17,14 @@ export function ProtectedRoute() {
 
   useEffect(() => {
     if (token && query.data) {
-      setSession(token, { ...query.data, profileCompleted: user?.profileCompleted ?? query.data.profileCompleted })
+      // Use server's profile_completed as canonical truth
+      const serverProfileCompleted = query.data.profile_completed ?? query.data.profileCompleted ?? false
+      setSession(token, {
+        ...query.data,
+        profileCompleted: serverProfileCompleted,
+      })
     }
-  }, [query.data, setSession, token, user?.profileCompleted])
+  }, [query.data, setSession, token])
 
   if (!token) return <Navigate to="/login" replace />
 
