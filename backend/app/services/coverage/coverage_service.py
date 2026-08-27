@@ -6,6 +6,7 @@ sequence integrity checks, weighted coverage, remaining curriculum generation, D
 
 from __future__ import annotations
 
+import re
 import logging
 from time import perf_counter
 from typing import Any, Dict, List, Optional
@@ -128,27 +129,28 @@ class CoverageService:
         chunks_by_topic: Dict[UUID, List[dict]] = {t.id: [] for t in all_topics}
 
         for chunk in transcript_chunks:
+            text_lower = chunk.get("text", "").lower()
             raw_t_id = chunk.get("topic_id")
-            matched_topic_id = None
             if raw_t_id:
                 try:
-                    matched_topic_id = UUID(str(raw_t_id))
+                    tid = UUID(str(raw_t_id))
+                    if tid in chunks_by_topic:
+                        chunks_by_topic[tid].append(chunk)
                 except Exception:
                     pass
 
-            if not matched_topic_id or matched_topic_id not in topic_map:
-                # Match text to segment
-                text_lower = chunk.get("text", "").lower()
-                for seg in segments:
-                    for idx, title in enumerate(seg.topic_titles):
-                        if title.lower() in text_lower:
-                            matched_topic_id = seg.topic_ids[idx] if idx < len(seg.topic_ids) else seg.unit_id
-                            break
-                    if matched_topic_id:
-                        break
-
-            if matched_topic_id and matched_topic_id in chunks_by_topic:
-                chunks_by_topic[matched_topic_id].append(chunk)
+            for topic in all_topics:
+                t_clean = topic.topic_name.lower().lstrip("-#* :").strip()
+                if t_clean and len(t_clean) >= 3:
+                    key_words = [w for w in re.findall(r'[a-zA-Z0-9]+', t_clean) if len(w) >= 3 and w not in ("general", "syllabus", "topics", "course", "instructor", "master", "unit", "and", "the", "for", "with", "based", "level")]
+                    if key_words:
+                        primary_term = key_words[0]
+                        # Match if full cleaned title in text, or primary term in text, or any acronym in parentheses
+                        acronyms = re.findall(r'\(([a-zA-Z0-9]+)\)', topic.topic_name.lower())
+                        has_acronym_match = any(a in text_lower.split() for a in acronyms)
+                        if t_clean in text_lower or (primary_term in text_lower) or has_acronym_match:
+                            if chunk not in chunks_by_topic[topic.id]:
+                                chunks_by_topic[topic.id].append(chunk)
 
         logger.info("Coverage Detection Started: Grouped chunks across %d curriculum topic(s)", len(all_topics))
 
