@@ -10,7 +10,8 @@ type ContextState = {
   setLectureId: (id: string | null) => void; 
   setCourseId: (id: string | null, name?: string | null) => void; 
   setCurriculumId: (id: string | null) => void; 
-  setSemester: (semester: string | null) => void 
+  setSemester: (semester: string | null) => void;
+  resetContext: () => void;
 }
 
 export const useContextStore = create<ContextState>()(persist((set) => ({ 
@@ -22,5 +23,12 @@ export const useContextStore = create<ContextState>()(persist((set) => ({
   setLectureId: (selectedLectureId) => set({ selectedLectureId }), 
   setCourseId: (selectedCourseId, selectedCourseName) => set({ selectedCourseId, ...(selectedCourseName !== undefined ? { selectedCourseName } : {}) }), 
   setCurriculumId: (selectedCurriculumId) => set({ selectedCurriculumId }), 
-  setSemester: (semester) => set({ semester }) 
+  setSemester: (semester) => set({ semester }),
+  resetContext: () => set({
+    selectedLectureId: null,
+    selectedCourseId: null,
+    selectedCourseName: null,
+    selectedCurriculumId: null,
+    semester: null,
+  })
 }), { name: 'classroomiq-context' }))

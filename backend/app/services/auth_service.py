@@ -70,8 +70,7 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
     db.flush()
 
     if payload.role == "faculty":
-        if not payload.employee_id:
-            raise ValueError("employee_id is required for faculty registration")
+        employee_id = payload.employee_id.strip() if payload.employee_id else f"FAC_{str(user.id)[:8].upper()}"
 
         institution = get_or_create_default_institution(db)
         department_code = payload.department_code or payload.department_name or "GENERAL"
@@ -81,7 +80,7 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
         faculty = Faculty(
             user_id=user.id,
             department_id=department.id,
-            employee_id=payload.employee_id.strip(),
+            employee_id=employee_id,
             designation=payload.designation.strip() if payload.designation else None,
         )
         db.add(faculty)

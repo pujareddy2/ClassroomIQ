@@ -40,7 +40,7 @@ export function LecturesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
-  const { selectedCourseId, semester, setLectureId, selectedLectureId } = useContextStore()
+  const { selectedCourseId, selectedCourseName, semester, setLectureId, selectedLectureId } = useContextStore()
 
   const [activeTabMode, setActiveTabMode] = useState<'LIST' | 'LIVE'>('LIST')
   const [handoverSessionId, setHandoverSessionId] = useState<string | null>(null)
@@ -251,10 +251,10 @@ export function LecturesPage() {
             <div>
               <span className="text-[10px] font-mono font-bold text-brand uppercase tracking-wider block">ACTIVE COURSE CONTEXT</span>
               <h3 className="text-lg font-extrabold text-ink dark:text-white leading-snug">
-                {selectedCourseId ? 'AI and Agentic AI (Fall 2026)' : 'Select a course to manage lectures'}
+                {selectedCourseName || (selectedCourseId ? 'Active Course' : 'No course selected')}
               </h3>
               <p className="text-xs text-muted dark:text-slate-300 font-medium">
-                Semester 6 · Academic Year 2026-2027
+                {selectedCourseId ? (semester || 'Semester 6 · Academic Year 2026-2027') : 'Create or select a course from the Courses page to manage lectures'}
               </p>
             </div>
           </div>
@@ -497,7 +497,7 @@ export function LecturesPage() {
                   </label>
                   <input
                     disabled
-                    value={selectedCourseId ? "AI and Agentic AI (Computer Networks)" : "Default Course"}
+                    value={selectedCourseName || (selectedCourseId ? "Active Course" : "No Course Selected")}
                     className="h-11 w-full rounded-xl border border-line bg-canvas/50 px-3.5 text-sm font-bold text-muted cursor-not-allowed"
                   />
                 </div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useContextStore } from './context-store'
 
 export type CurrentUser = {
   id: string
@@ -30,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       setSession: (token, user) => {
         localStorage.setItem('classroomiq.token', token)
+        useContextStore.getState().resetContext()
         set({ token, user })
       },
       updateUserProfile: (profileData) => {
@@ -39,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
       },
       clearSession: () => {
         localStorage.removeItem('classroomiq.token')
+        useContextStore.getState().resetContext()
         set({ token: null, user: null })
       }
     }),
