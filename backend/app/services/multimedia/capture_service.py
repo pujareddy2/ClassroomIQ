@@ -416,9 +416,9 @@ class CaptureService:
             media_meta = MediaMetadataResponse(**meta)
 
         # Check downstream flags
-        has_transcript = bool(recording and recording.transcript)
-        has_coverage = bool(lecture.coverage_report)
-        has_validation = bool(lecture.recommendations)
+        has_transcript = bool(recording and getattr(recording, 'transcript', None))
+        has_coverage = bool(getattr(lecture, 'coverage_report', None) or getattr(lecture, 'reports', None))
+        has_validation = bool(getattr(lecture, 'recommendations', None))
 
         return SessionDetailResponse(
             session_id=session_id,

@@ -24,7 +24,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.api.auth import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.repositories.curriculum_repository import CurriculumRepository
 from app.schemas.curriculum import (
     CurriculumDeleteResponse,
@@ -76,6 +78,7 @@ async def upload_curriculum(
     title: Annotated[str, Form(...)],
     file: Annotated[UploadFile, File(...)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     document_type: Annotated[str, Form(...)] = "SYLLABUS",
     description: Annotated[str | None, Form(...)] = None,
 ) -> dict:
@@ -91,7 +94,10 @@ async def upload_curriculum(
             document_type=document_type,
             description=description,
         )
-        _, response = await service.upload_curriculum(metadata, file)
+        curriculum, response = await service.upload_curriculum(metadata, file)
+        # Stamp ownership on the curriculum record
+        if curriculum is not None and hasattr(curriculum, 'created_by'):
+            curriculum.created_by = current_user.id
         db.commit()
         return created(
             data=response.model_dump(),
@@ -118,23 +124,25 @@ async def upload_curriculum(
 @router.get(
     "",
     status_code=status.HTTP_200_OK,
-    summary="List all curricula",
-    description="Returns a paginated list of all uploaded curricula. Supports filtering by course_id and faculty_id.",
+    summary="List my curricula",
+    description="Returns a paginated list of curricula belonging to the authenticated faculty.",
 )
 def list_curricula(
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     course_id: Optional[UUID] = Query(default=None, description="Filter by course UUID"),
-    faculty_id: Optional[UUID] = Query(default=None, description="Filter by faculty UUID"),
 ) -> dict:
     start = time.time()
     repo = CurriculumRepository(db)
-    items, pagination_meta = repo.list_curricula(
+    # Always scope to the current user's curricula (created_by)
+    # Use created_by UUID for ownership filtering
+    items, pagination_meta = repo.list_curricula_by_owner(
+        owner_id=current_user.id,
         page=page,
         page_size=page_size,
         course_id=course_id,
-        faculty_id=faculty_id,
     )
     data = [CurriculumListItem.model_validate(c).model_dump() for c in items]
     return paginated(

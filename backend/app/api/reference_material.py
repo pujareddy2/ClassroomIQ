@@ -5,11 +5,13 @@ import time
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.api.auth import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.reference_material import ReferenceUploadMetadata, ReferenceUploadResponse
 from app.schemas.response import created, ok
 from app.services.reference_service import ReferenceService
@@ -40,6 +42,7 @@ async def upload_reference_material(
     title: Annotated[str, Form(...)],
     file: Annotated[UploadFile, File(...)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     document_type: Annotated[str, Form(...)],
     description: Annotated[str | None, Form(...)] = None,
 ) -> dict:
@@ -55,7 +58,10 @@ async def upload_reference_material(
             description=description,
         )
         start = time.time()
-        _, response = await service.upload_reference_material(metadata, file)
+        ref_material, response = await service.upload_reference_material(metadata, file)
+        # Stamp ownership so list queries can scope by created_by
+        if ref_material is not None and hasattr(ref_material, 'created_by'):
+            ref_material.created_by = current_user.id
         db.commit()
         return created(data=response.model_dump(), message="Reference material uploaded.", start_ts=start)
     except ValidationError as exc:
@@ -77,15 +83,19 @@ async def upload_reference_material(
 
 @router.get(
     "/list",
-    summary="List reference materials",
-    description="Returns list of uploaded reference materials.",
+    summary="List my reference materials",
+    description="Returns reference materials uploaded by the authenticated faculty member.",
 )
 def list_reference_materials(
     db: Annotated[Session, Depends(get_db)],
-    course_id: UUID | None = None,
+    current_user: Annotated[User, Depends(get_current_user)],
+    course_id: UUID | None = Query(default=None),
 ) -> dict:
     from app.models.reference_material import ReferenceMaterial
-    query = db.query(ReferenceMaterial).filter(ReferenceMaterial.deleted_at.is_(None))
+    query = db.query(ReferenceMaterial).filter(
+        ReferenceMaterial.deleted_at.is_(None),
+        ReferenceMaterial.created_by == current_user.id,
+    )
     if course_id:
         query = query.filter(ReferenceMaterial.course_id == course_id)
     items = query.all()

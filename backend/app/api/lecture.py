@@ -26,11 +26,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.auth import get_current_user
 from app.db.session import get_db
 from app.models.course import Course
 from app.models.faculty import Faculty
 from app.models.lecture_session import LectureSession
 from app.models.transcript import Transcript
+from app.models.user import User
 from app.schemas.response import created, ok
 from app.schemas.transcript import (
     ChunkResponse,
@@ -55,14 +57,22 @@ router = APIRouter(prefix="/lecture", tags=["Lecture Intelligence"])
     "/list",
     status_code=status.HTTP_200_OK,
     summary="List lectures for a course",
-    description="Returns all active lectures for a course or faculty member.",
+    description="Returns active lectures belonging to the authenticated faculty member.",
 )
 def list_lectures(
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     course_id: str | None = Query(None),
 ) -> dict:
     try:
+        # First find the faculty record for this user
+        faculty = db.query(Faculty).filter(Faculty.user_id == current_user.id).first()
+
         query = db.query(LectureSession).filter(LectureSession.deleted_at.is_(None))
+
+        # Scope to this faculty member's lectures only
+        if faculty:
+            query = query.filter(LectureSession.faculty_id == faculty.id)
 
         if course_id and course_id.strip():
             try:
@@ -124,6 +134,7 @@ def list_lectures(
 )
 async def upload_lecture(
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     title: Annotated[str, Form(...)],
     course_id: Annotated[str, Form(...)],
     faculty_name: Annotated[str | None, Form(...)] = "Faculty Member",
@@ -158,33 +169,26 @@ async def upload_lecture(
             db.add(course)
             db.flush()
 
-    # 2. Resolve Faculty
-    faculty = db.query(Faculty).join(Faculty.user).filter(
-        Faculty.user.has(full_name=faculty_name.strip())
-    ).first() if faculty_name else None
+    # 2. Resolve Faculty — use authenticated user's faculty record
+    faculty = db.query(Faculty).filter(Faculty.user_id == current_user.id).first()
 
     if not faculty:
-        faculty = db.query(Faculty).first()
-        if not faculty:
-            # Get current user or first user
-            cur_user = current_user or db.query(User).first()
-            if not cur_user:
-                cur_user = User(
-                    full_name=faculty_name.strip() or "Dr. Grace Hopper",
-                    email="faculty@classroomiq.ai",
-                    hashed_password="password123",
-                    role="FACULTY"
-                )
-                db.add(cur_user)
-                db.flush()
-            
-            faculty = Faculty(
-                user_id=cur_user.id,
-                title="Professor",
-                designation="Senior Faculty"
-            )
-            db.add(faculty)
-            db.flush()
+        # Auto-provision a faculty record for this authenticated user
+        from app.services.auth_service import get_or_create_default_institution, get_or_create_department
+        institution = get_or_create_default_institution(db)
+        department = get_or_create_department(
+            db, institution.id,
+            current_user.department or "GENERAL",
+            current_user.department or "General Department",
+        )
+        faculty = Faculty(
+            user_id=current_user.id,
+            department_id=department.id,
+            designation=current_user.designation or "Faculty",
+            employee_id=f"FAC_{str(current_user.id)[:8].upper()}",
+        )
+        db.add(faculty)
+        db.flush()
 
     # 3. Read content and handle media/document/text formats
     transcript_items = None

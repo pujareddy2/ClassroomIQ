@@ -59,6 +59,35 @@ class CurriculumRepository(BaseRepository):
 
         return items, make_pagination_meta(page, page_size, total_items)
 
+    def list_curricula_by_owner(
+        self,
+        owner_id: UUID,
+        page: int = 1,
+        page_size: int = 20,
+        course_id: UUID | None = None,
+        status: str = "ACTIVE",
+    ) -> tuple[list[Curriculum], PaginationMeta]:
+        """Return curricula belonging to the authenticated user (created_by = owner_id).
+
+        This is the TENANT-SAFE query — a faculty member only sees their own courses.
+        """
+        stmt = select(Curriculum).where(
+            Curriculum.status == status,
+            Curriculum.created_by == owner_id,
+        )
+
+        if course_id is not None:
+            stmt = stmt.where(Curriculum.course_id == course_id)
+
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_items = int(self.db.execute(count_stmt).scalar_one())
+
+        stmt = stmt.order_by(Curriculum.uploaded_at.desc())
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        items = list(self.db.execute(stmt).scalars().all())
+
+        return items, make_pagination_meta(page, page_size, total_items)
+
     # ── Soft Delete ───────────────────────────────────────────────────────────
 
     def soft_delete_curriculum(self, curriculum_id: UUID) -> Curriculum | None:
