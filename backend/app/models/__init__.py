@@ -53,6 +53,7 @@ from app.models.explanation_engine import (
     ExplanationSummary,
 )
 from app.models.analysis_job import AnalysisJob
+from app.models.media_processing_job import MediaProcessingJob
 
 __all__ = [
     "Institution",
@@ -104,4 +105,5 @@ __all__ = [
     "ReasoningStep",
     "ExplanationSummary",
     "AnalysisJob",
+    "MediaProcessingJob",
 ]

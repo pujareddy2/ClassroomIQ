@@ -17,6 +17,11 @@ from app.api.workflow import router as workflow_router
 from app.api.analysis import router as analysis_router
 from app.api.assistant import router as assistant_router
 from app.api.rag import router as rag_router
+from app.api.multimedia import router as multimedia_router
+from app.api.audio import router as audio_router
+from app.api.video import router as video_router
+from app.api.structuring import router as structuring_router
+from app.api.jobs import router as jobs_router
 from app.api.contract import install_api_contract
 from app.db import base  # noqa: F401 — imports all models so metadata is populated
 from app.db.init_db import init_db
@@ -27,9 +32,9 @@ app = FastAPI(
         "Backend API for the ClassroomIQ Academic Intelligence & Analytics Engine. "
         "Handles curriculum intelligence, RAG pipeline, technical validation, "
         "coverage analysis, teaching intelligence, faculty recommendations, "
-        "and Explainable AI (XAI) trust layer."
+        "multimedia ingestion, audio-video processing, and Explainable AI (XAI) trust layer."
     ),
-    version="0.6.0",
+    version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -98,3 +103,8 @@ app.include_router(workflow_router, prefix="/api/v1", dependencies=_protected)
 app.include_router(analysis_router, prefix="/api/v1", dependencies=_protected)
 app.include_router(assistant_router, prefix="/api/v1", dependencies=_protected)
 app.include_router(rag_router, prefix="/api/v1", dependencies=_protected)
+app.include_router(multimedia_router, prefix="/api/v1", dependencies=_protected)
+app.include_router(audio_router, prefix="/api/v1", dependencies=_protected)
+app.include_router(video_router, prefix="/api/v1", dependencies=_protected)
+app.include_router(structuring_router, prefix="/api/v1", dependencies=_protected)
+app.include_router(jobs_router, prefix="/api/v1", dependencies=_protected)
