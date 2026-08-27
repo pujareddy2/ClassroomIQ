@@ -20,7 +20,11 @@ import {
   Sparkles,
   ArrowRight,
   Filter,
-  Check
+  Check,
+  Radio,
+  Share2,
+  Video,
+  Layers
 } from 'lucide-react'
 import { PageLayout } from '@/components/page-layout'
 import { Card, EmptyState } from '@/components/ui'
@@ -29,11 +33,17 @@ import { useContextStore } from '@/store/context-store'
 import { useAuthStore } from '@/store/auth-store'
 import { friendlyError } from '@/hooks/use-api-query'
 
+import LiveRecorder from '@/components/LiveRecorder'
+import HandoverContractModal from '@/components/HandoverContractModal'
+
 export function LecturesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const { selectedCourseId, semester, setLectureId, selectedLectureId } = useContextStore()
+
+  const [activeTabMode, setActiveTabMode] = useState<'LIST' | 'LIVE'>('LIST')
+  const [handoverSessionId, setHandoverSessionId] = useState<string | null>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'READY' | 'PROCESSING' | 'FAILED'>('ALL')
@@ -161,22 +171,76 @@ export function LecturesPage() {
 
   return (
     <PageLayout
-      title="Lecture Workflow"
-      description="Upload and process your delivered lectures. ClassroomIQ converts lecture recordings into structured transcripts ready for analysis."
+      title="Lecture Workflow & Capture Studio"
+      description="Record live lectures with webcam/microphone or upload lecture files. Converts audio/video streams into structured transcripts ready for AI analysis."
       hideContextBadges={true}
       actions={
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveTabMode(activeTabMode === 'LIVE' ? 'LIST' : 'LIVE')}
+            className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition shadow-soft ${activeTabMode === 'LIVE' ? 'bg-rose-500 text-white' : 'border border-line bg-canvas text-ink dark:text-white hover:bg-surface'}`}
+          >
+            <Radio className="h-4 w-4 animate-pulse text-rose-400" />
+            <span>{activeTabMode === 'LIVE' ? '← Back to Lectures Workspace' : '🔴 Live Studio Capture'}</span>
+          </button>
+
           <button
             onClick={() => setIsUploadOpen(true)}
             className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-bold text-white shadow-soft transition hover:bg-brand/90 hover:scale-105 active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            <span>+ Upload Lecture</span>
+            <span>+ Upload Lecture File</span>
           </button>
         </div>
       }
     >
       <div className="space-y-6">
+
+        {/* Tab Switcher Banner */}
+        <div className="flex items-center gap-2 bg-canvas border border-line p-1.5 rounded-2xl">
+          <button
+            onClick={() => setActiveTabMode('LIST')}
+            className={`flex-1 py-2.5 px-4 text-xs font-extrabold rounded-xl transition flex items-center justify-center gap-2 ${activeTabMode === 'LIST' ? 'bg-brand text-white shadow-soft' : 'text-muted dark:text-slate-300 hover:text-ink'}`}
+          >
+            <FileText className="h-4 w-4" />
+            <span>Uploaded Lectures Workspace & Ingestion</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTabMode('LIVE')}
+            className={`flex-1 py-2.5 px-4 text-xs font-extrabold rounded-xl transition flex items-center justify-center gap-2 ${activeTabMode === 'LIVE' ? 'bg-rose-600 text-white shadow-soft' : 'text-muted dark:text-slate-300 hover:text-ink'}`}
+          >
+            <Video className="h-4 w-4" />
+            <span>Member 1 Live Studio Capture (Webcam, Mic, Smart Board)</span>
+          </button>
+        </div>
+
+        {activeTabMode === 'LIVE' ? (
+          <div className="rounded-3xl border border-line bg-surface dark:bg-slate-900 p-6 shadow-soft space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-4">
+              <div>
+                <span className="text-xs font-mono font-bold text-rose-400 uppercase tracking-wider block">MEMBER 1 LIVE CAPTURE STUDIO</span>
+                <h2 className="text-lg font-extrabold text-ink dark:text-white">Real-Time Classroom Recorder</h2>
+              </div>
+              <span className="text-xs font-semibold text-muted bg-canvas border border-line px-3 py-1 rounded-full">
+                Auto-streams 5s slices to FastAPI Backend
+              </span>
+            </div>
+
+            <LiveRecorder
+              onSessionCreated={(sessionData: any) => {
+                queryClient.invalidateQueries({ queryKey: ['lectures'] })
+                const newId = String(sessionData?.session_id || sessionData?.id || '')
+                if (newId) {
+                  setLectureId(newId)
+                  setHandoverSessionId(newId)
+                }
+                setActiveTabMode('LIST')
+              }}
+            />
+          </div>
+        ) : (
+          <>
 
         {/* PROMINENT SELECTED COURSE BAR */}
         <div className="rounded-2xl border border-line bg-surface dark:bg-slate-900 p-5 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -651,15 +715,27 @@ export function LecturesPage() {
 
               {/* Footer */}
               <div className="flex items-center justify-between border-t border-line pt-4 shrink-0">
-                <button
-                  onClick={() => {
-                    setDeletingLectureId(viewingLectureId)
-                  }}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-danger hover:underline"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Delete Lecture</span>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setDeletingLectureId(viewingLectureId)
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-danger hover:underline"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete Lecture</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setHandoverSessionId(viewingLectureId)
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 rounded-lg hover:bg-indigo-500/20"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    <span>Inspect Member 1 Handover Payload</span>
+                  </button>
+                </div>
 
                 <div className="flex items-center gap-3">
                   <button
@@ -714,6 +790,17 @@ export function LecturesPage() {
               </div>
             </div>
           </div>
+        )}
+
+        </>
+        )}
+
+        {/* MEMBER 1 HANDOVER CONTRACT INSPECTION MODAL */}
+        {handoverSessionId && (
+          <HandoverContractModal
+            sessionId={handoverSessionId}
+            onClose={() => setHandoverSessionId(null)}
+          />
         )}
 
       </div>
