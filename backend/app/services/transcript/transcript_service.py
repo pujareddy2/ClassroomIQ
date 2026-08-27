@@ -102,7 +102,12 @@ class TranscriptService:
         logger.info("Lecture Metadata Resolved: ID %s", lecture.id)
 
         # ── Step 4: Store Original Transcript ─────────────────────────────────
-        raw_full_text = "\n".join([f"{item.get('speaker', 'Faculty')}: {item.get('text', '')}" for item in transcript_data])
+        raw_lines = []
+        for item in transcript_data:
+            spk = str(item.get('speaker', 'Faculty')).replace('\x00', '')
+            txt = str(item.get('text', '')).replace('\x00', '')
+            raw_lines.append(f"{spk}: {txt}")
+        raw_full_text = "\n".join(raw_lines).replace("\x00", "")
 
         transcript_record = Transcript(
             lecture_id=lecture.id,

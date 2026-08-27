@@ -168,28 +168,28 @@ async def upload_lecture(
         filename = (file.filename or "").lower()
         if filename.endswith(".json"):
             try:
-                parsed_json = json.loads(content_bytes.decode("utf-8"))
+                parsed_json = json.loads(content_bytes.decode("utf-8", errors="ignore").replace("\x00", ""))
                 if isinstance(parsed_json, list):
                     transcript_items = parsed_json
                 elif isinstance(parsed_json, dict) and "transcript" in parsed_json:
                     transcript_items = parsed_json["transcript"]
                 else:
-                    transcript_items = [{"speaker": "Faculty", "start": 0.0, "end": 60.0, "text": str(parsed_json)}]
+                    transcript_items = [{"speaker": "Faculty", "start": 0.0, "end": 60.0, "text": str(parsed_json).replace("\x00", "")}]
             except Exception:
-                transcript_text = content_bytes.decode("utf-8", errors="ignore")
+                transcript_text = content_bytes.decode("utf-8", errors="ignore").replace("\x00", "")
                 transcript_items = None
         else:
-            transcript_text = content_bytes.decode("utf-8", errors="ignore")
+            transcript_text = content_bytes.decode("utf-8", errors="ignore").replace("\x00", "")
             transcript_items = None
     elif raw_text and raw_text.strip():
-        transcript_text = raw_text.strip()
+        transcript_text = raw_text.strip().replace("\x00", "")
         transcript_items = None
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please upload a lecture file or provide transcript text.")
 
     # Format transcript items if text
     if not transcript_items:
-        lines = [line.strip() for line in transcript_text.splitlines() if line.strip()]
+        lines = [line.strip().replace("\x00", "") for line in transcript_text.splitlines() if line.strip()]
         if not lines:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file contains no readable transcript text.")
         
@@ -201,8 +201,8 @@ async def upload_lecture(
             text_val = line
             if ":" in line and len(line.split(":")[0]) < 20:
                 parts = line.split(":", 1)
-                speaker = parts[0].strip()
-                text_val = parts[1].strip()
+                speaker = parts[0].strip().replace("\x00", "")
+                text_val = parts[1].strip().replace("\x00", "")
 
             transcript_items.append({
                 "speaker": speaker,

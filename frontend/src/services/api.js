@@ -8,7 +8,14 @@ const API_BASE = '/api/v1';
 // ── Auth Token Helpers ─────────────────────────────────────────────────────────
 
 function getStoredToken() {
-  return localStorage.getItem('classroomiq_token') || sessionStorage.getItem('classroomiq_token') || null;
+  const directToken = localStorage.getItem('token') || localStorage.getItem('classroomiq_token') || sessionStorage.getItem('classroomiq_token');
+  if (directToken) return directToken;
+  try {
+    const authStore = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+    return authStore?.state?.token || null;
+  } catch {
+    return null;
+  }
 }
 
 export function setAuthToken(token) {
