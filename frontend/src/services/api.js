@@ -1,17 +1,24 @@
-/**
- * ClassroomIQ API Client
- * Handles auth headers, async job polling, and all Multimedia/Audio/Video/Structuring API calls.
- */
+import { useAuthStore } from '../store/auth-store';
 
 const API_BASE = '/api/v1';
 
 // ── Auth Token Helpers ─────────────────────────────────────────────────────────
 
 function getStoredToken() {
-  const directToken = localStorage.getItem('token') || localStorage.getItem('classroomiq_token') || sessionStorage.getItem('classroomiq_token');
-  if (directToken) return directToken;
   try {
-    const authStore = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+    const stateToken = useAuthStore.getState()?.token;
+    if (stateToken) return stateToken;
+  } catch {}
+
+  const directToken =
+    localStorage.getItem('classroomiq.token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('classroomiq_token') ||
+    sessionStorage.getItem('classroomiq_token');
+  if (directToken) return directToken;
+
+  try {
+    const authStore = JSON.parse(localStorage.getItem('classroomiq-auth') || '{}');
     return authStore?.state?.token || null;
   } catch {
     return null;
