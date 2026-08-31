@@ -128,6 +128,12 @@ After activation, your prompt will display `(.venv)`.
 pip install -r requirements.txt
 ```
 
+### apart of project route
+```powershell
+pip install -r ..\requirements.txt
+```
+
+
 ### Step 5 — Configure Environment Variables
 
 Ensure `.env` exists at the project root (`ClassroomIQ/.env`):
@@ -141,6 +147,12 @@ DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/classroomiq
 ```powershell
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+### overall backend -
+```cd backend
+.\.venv\Scripts\activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
 
 ---
 

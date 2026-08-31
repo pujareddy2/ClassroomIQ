@@ -484,7 +484,8 @@ export function AiResultsPage() {
 
           <p className="text-sm font-sans text-ink dark:text-slate-200 leading-relaxed bg-canvas/60 p-4 rounded-2xl border border-line/60">
             {(teachingSummary as any)?.qualitative_summary || 
-              `Your lecture on "${lectureData?.title || 'this session'}" covered the target curriculum concepts with strong clarity. Major topic explanations were structured logically before practical examples. Round Robin and Priority scheduling received lighter focus, and student interaction density can be heightened with targeted recap checks.`
+             (coverageSummary as any)?.executive_summary ||
+             `AI analysis completed for "${lectureData?.title || 'this session'}". ${coveredTopicsCount} of ${totalTopics} curriculum topic(s) were identified in the transcript with an overall weighted coverage score of ${weightedCov}%.`
             }
           </p>
 
@@ -504,10 +505,10 @@ export function AiResultsPage() {
                     </li>
                   ))
                 ) : (
-                  <>
-                    <li className="flex items-start gap-2"><span className="text-emerald-400 font-bold">•</span><span>Clear concept introduction before example demonstrations</span></li>
-                    <li className="flex items-start gap-2"><span className="text-emerald-400 font-bold">•</span><span>Consistent alignment with course syllabus reference notes</span></li>
-                  </>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold">•</span>
+                    <span>Structured delivery across {coveredTopicsCount} detected curriculum topic(s) with aligned reference grounding.</span>
+                  </li>
                 )}
               </ul>
             </div>
@@ -526,11 +527,16 @@ export function AiResultsPage() {
                       <span>{w}</span>
                     </li>
                   ))
+                ) : totalTopics > coveredTopicsCount ? (
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    <span>{totalTopics - coveredTopicsCount} reference curriculum topic(s) were not detected in this delivered lecture transcript.</span>
+                  </li>
                 ) : (
-                  <>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold">•</span><span>Secondary algorithm explanations were relatively brief</span></li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold">•</span><span>Few student verification questions detected in middle section</span></li>
-                  </>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    <span>All reference curriculum topics were successfully covered.</span>
+                  </li>
                 )}
               </ul>
             </div>

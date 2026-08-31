@@ -22,9 +22,13 @@ import {
   Filter,
   Check,
   Radio,
+<<<<<<< HEAD
   Share2,
   Video,
   Layers
+=======
+  Video
+>>>>>>> 8e2376a (feat: Integrate Live Studio Capture, robust multi-format lecture uploads, and dynamic AI results)
 } from 'lucide-react'
 import { PageLayout } from '@/components/page-layout'
 import { Card, EmptyState } from '@/components/ui'
@@ -32,6 +36,7 @@ import { lectureService } from '@/services/lecture-service'
 import { useContextStore } from '@/store/context-store'
 import { useAuthStore } from '@/store/auth-store'
 import { friendlyError } from '@/hooks/use-api-query'
+import LiveRecorder from '@/components/LiveRecorder'
 
 import LiveRecorder from '@/components/LiveRecorder'
 import HandoverContractModal from '@/components/HandoverContractModal'
@@ -45,6 +50,7 @@ export function LecturesPage() {
   const [activeTabMode, setActiveTabMode] = useState<'LIST' | 'LIVE'>('LIST')
   const [handoverSessionId, setHandoverSessionId] = useState<string | null>(null)
 
+  const [activeTabMode, setActiveTabMode] = useState<'LIST' | 'LIVE'>('LIST')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'READY' | 'PROCESSING' | 'FAILED'>('ALL')
   
@@ -241,32 +247,31 @@ export function LecturesPage() {
           </div>
         ) : (
           <>
+            {/* PROMINENT SELECTED COURSE BAR */}
+            <div className="rounded-2xl border border-line bg-surface dark:bg-slate-900 p-5 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand shrink-0">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-brand uppercase tracking-wider block">ACTIVE COURSE CONTEXT</span>
+                  <h3 className="text-lg font-extrabold text-ink dark:text-white leading-snug">
+                    {selectedCourseName || (selectedCourseId ? 'Active Course' : 'No course selected')}
+                  </h3>
+                  <p className="text-xs text-muted dark:text-slate-300 font-medium">
+                    {selectedCourseId ? (semester || 'Semester 6 · Academic Year 2026-2027') : 'Create or select a course from the Courses page to manage lectures'}
+                  </p>
+                </div>
+              </div>
 
-        {/* PROMINENT SELECTED COURSE BAR */}
-        <div className="rounded-2xl border border-line bg-surface dark:bg-slate-900 p-5 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand shrink-0">
-              <BookOpen className="h-6 w-6" />
+              <Link
+                to="/courses"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-canvas px-4 text-xs font-bold text-ink dark:text-white hover:bg-surface transition shrink-0"
+              >
+                <span>Change Course</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
-            <div>
-              <span className="text-[10px] font-mono font-bold text-brand uppercase tracking-wider block">ACTIVE COURSE CONTEXT</span>
-              <h3 className="text-lg font-extrabold text-ink dark:text-white leading-snug">
-                {selectedCourseName || (selectedCourseId ? 'Active Course' : 'No course selected')}
-              </h3>
-              <p className="text-xs text-muted dark:text-slate-300 font-medium">
-                {selectedCourseId ? (semester || 'Semester 6 · Academic Year 2026-2027') : 'Create or select a course from the Courses page to manage lectures'}
-              </p>
-            </div>
-          </div>
-
-          <Link
-            to="/courses"
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-canvas px-4 text-xs font-bold text-ink dark:text-white hover:bg-surface transition shrink-0"
-          >
-            <span>Change Course</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
 
         {/* SEARCH & FILTER BAR */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -438,6 +443,8 @@ export function LecturesPage() {
             </div>
           </div>
         )}
+      </>
+    )}
 
         {/* LECTURE UPLOAD MODAL */}
         {isUploadOpen && (

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import logging
+import re
 from time import perf_counter
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
@@ -144,7 +145,6 @@ class CoverageService:
                 if t_clean and len(t_clean) >= 3:
                     key_words = [w for w in re.findall(r'[a-zA-Z0-9]+', t_clean) if len(w) >= 3 and w not in ("general", "syllabus", "topics", "course", "instructor", "master", "unit", "and", "the", "for", "with", "based", "level")]
                     if key_words:
-                        primary_term = key_words[0]
                         # Match if full cleaned title in text, or primary term in text, or any acronym in parentheses
                         acronyms = re.findall(r'\(([a-zA-Z0-9]+)\)', topic.topic_name.lower())
                         has_acronym_match = any(a in text_lower.split() for a in acronyms)

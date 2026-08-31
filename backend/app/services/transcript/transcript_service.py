@@ -250,14 +250,17 @@ class TranscriptService:
             "transcript_id": str(transcript.id) if transcript else None,
         }
 
-    def get_lecture_chunks(self, lecture_id: UUID) -> List[Dict[str, Any]]:
+    def get_lecture_chunks(self, lecture_id: UUID, limit: int = 500) -> List[Dict[str, Any]]:
         transcript = self.db.query(Transcript).filter(Transcript.lecture_id == lecture_id).first()
         if not transcript:
             raise LectureNotFoundError(f"Transcript for lecture '{lecture_id}' not found")
 
-        chunks = self.db.query(TranscriptChunk).filter(
+        query = self.db.query(TranscriptChunk).filter(
             TranscriptChunk.transcript_id == transcript.id
-        ).order_by(TranscriptChunk.chunk_index).all()
+        ).order_by(TranscriptChunk.chunk_index)
+        if limit:
+            query = query.limit(limit)
+        chunks = query.all()
 
         return [
             {

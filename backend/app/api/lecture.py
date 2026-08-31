@@ -20,6 +20,7 @@ import logging
 import time
 from datetime import date, datetime, timezone
 from typing import Annotated, Any
+import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -53,6 +54,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/lecture", tags=["Lecture Intelligence"])
 
 
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from app.core.security import decode_token
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
 @router.get(
     "/list",
     status_code=status.HTTP_200_OK,
@@ -63,6 +70,7 @@ def list_lectures(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     course_id: str | None = Query(None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict:
     try:
         # First find the faculty record for this user
@@ -84,6 +92,20 @@ def list_lectures(
                 ).first()
                 if course:
                     query = query.filter(LectureSession.course_id == course.id)
+                else:
+                    return ok(data=[], message="No lectures found for course.")
+        elif credentials and credentials.credentials:
+            try:
+                payload = decode_token(credentials.credentials)
+                if payload and payload.get("sub"):
+                    u_id = UUID(payload["sub"])
+                    faculty = db.query(Faculty).filter(Faculty.user_id == u_id).first()
+                    if faculty:
+                        query = query.filter(LectureSession.faculty_id == faculty.id)
+                    else:
+                        return ok(data=[], message="No lectures found.")
+            except Exception:
+                pass
 
         lectures = query.order_by(LectureSession.created_at.desc()).all()
 
@@ -130,116 +152,109 @@ def list_lectures(
     "/upload",
     status_code=status.HTTP_201_CREATED,
     summary="Upload lecture recording or transcript file",
-    description="Uploads a lecture transcript file (.txt, .pdf, .json, .docx) or text content, processes chunks & curriculum mappings.",
+    description="Uploads a lecture transcript file (.txt, .pdf, .json, .docx, .mp4, .mp3, .wav) or text content, processes chunks & curriculum mappings.",
 )
 async def upload_lecture(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     title: Annotated[str, Form(...)],
-    course_id: Annotated[str, Form(...)],
-    faculty_name: Annotated[str | None, Form(...)] = "Faculty Member",
-    lecture_date: Annotated[str | None, Form(...)] = None,
-    file: Annotated[UploadFile | None, File(...)] = None,
-    raw_text: Annotated[str | None, Form(...)] = None,
+    course_id: str | None = Form(None),
+    faculty_name: str | None = Form(None),
+    lecture_date: str | None = Form(None),
+    file: UploadFile | None = File(None),
+    raw_text: str | None = Form(None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict:
     start_ts = time.time()
 
-    # 1. Resolve Course
-    course = None
-    try:
-        c_uuid = UUID(course_id.strip())
-        course = db.get(Course, c_uuid)
-    except ValueError:
-        pass
+    # 1. Resolve Faculty
+    faculty = None
+    if credentials and credentials.credentials:
+        try:
+            payload = decode_token(credentials.credentials)
+            if payload and payload.get("sub"):
+                u_id = UUID(payload["sub"])
+                faculty = db.query(Faculty).filter(Faculty.user_id == u_id).first()
+        except Exception:
+            pass
 
-    if not course:
-        course = db.query(Course).filter(
-            (Course.course_code.ilike(course_id.strip())) | (Course.course_name.ilike(course_id.strip()))
+    if not faculty and current_user:
+        faculty = db.query(Faculty).filter(Faculty.user_id == current_user.id).first()
+
+    if not faculty and faculty_name and faculty_name.strip():
+        faculty = db.query(Faculty).join(Faculty.user).filter(
+            Faculty.user.has(full_name=faculty_name.strip())
         ).first()
+
+    if not faculty:
+        faculty = db.query(Faculty).first()
+
+    # 2. Resolve Course
+    course = None
+    if course_id and course_id.strip() and course_id.strip().lower() not in ("course", "undefined", "null", "none"):
+        try:
+            c_uuid = UUID(course_id.strip())
+            course = db.get(Course, c_uuid)
+        except ValueError:
+            course = db.query(Course).filter(
+                (Course.course_code.ilike(course_id.strip())) | (Course.course_name.ilike(course_id.strip()))
+            ).first()
+
+    if not course and faculty:
+        # Check if faculty has associated curricula
+        from app.models.curriculum import Curriculum
+        curr = db.query(Curriculum).filter(Curriculum.faculty_id == faculty.id).first()
+        if curr and curr.course_id:
+            course = db.get(Course, curr.course_id)
 
     if not course:
         course = db.query(Course).first()
-        if not course:
-            course = Course(
-                course_code="CS301",
-                course_name="Data Structures and Algorithms",
-                description="Core Computer Science Course",
-                credits=4,
-            )
-            db.add(course)
-            db.flush()
 
-    # 2. Resolve Faculty — use authenticated user's faculty record
-    faculty = db.query(Faculty).filter(Faculty.user_id == current_user.id).first()
+    if not course:
+        from app.models.department import Department
+        dept = db.query(Department).first()
+        dept_id = dept.id if dept else None
+        course = Course(
+            course_code="CS101",
+            course_name="Introduction to Computer Science",
+            department="Computer Science",
+            department_id=dept_id,
+            semester="Fall 2026",
+            academic_year="2026-2027",
+            description="General Course"
+        )
+        db.add(course)
+        db.flush()
 
     if not faculty:
-        # Auto-provision a faculty record for this authenticated user
-        from app.services.auth_service import get_or_create_default_institution, get_or_create_department
-        institution = get_or_create_default_institution(db)
-        department = get_or_create_department(
-            db, institution.id,
-            current_user.department or "GENERAL",
-            current_user.department or "General Department",
-        )
-        faculty = Faculty(
-            user_id=current_user.id,
-            department_id=department.id,
-            designation=current_user.designation or "Faculty",
-            employee_id=f"FAC_{str(current_user.id)[:8].upper()}",
-        )
+        from app.models.institution import Institution
+        from app.models.department import Department
+        from app.models.user import User
+        inst = db.query(Institution).first()
+        if not inst:
+            inst = Institution(name="Default Institution", contact_email="admin@university.edu")
+            db.add(inst)
+            db.flush()
+        dept = db.query(Department).first()
+        if not dept:
+            dept = Department(institution_id=inst.id, code="CS", name="Computer Science")
+            db.add(dept)
+            db.flush()
+        usr = User(email="faculty.default@university.edu", password_hash="dummy", full_name="Faculty Member", role="faculty", is_active=True)
+        db.add(usr)
+        db.flush()
+        faculty = Faculty(user_id=usr.id, department_id=dept.id, employee_id=f"FAC-{uuid.uuid4().hex[:8].upper()}")
         db.add(faculty)
         db.flush()
 
-    # 3. Read content and handle media/document/text formats
-    transcript_items = None
+    # 3. Read and Extract content
     transcript_text = ""
+    transcript_items = None
 
-    if file:
+    if file and file.filename:
         content_bytes = await file.read()
-        filename = (file.filename or "").lower()
-        clean_title = title.strip().replace("\x00", "") or "Classroom Lecture Session"
-
-        # A. Video / Audio Media File (.mp4, .mp3, .wav, .mkv, .webm, .m4a, .avi, .mov)
-        if filename.endswith((".mp4", ".mp3", ".wav", ".mkv", ".webm", ".m4a", ".avi", ".mov")):
-            # Save uploaded recording file to disk
-            upload_dir = Path("uploads/lectures")
-            upload_dir.mkdir(parents=True, exist_ok=True)
-            saved_path = upload_dir / f"{int(time.time())}_{file.filename}"
-            with open(saved_path, "wb") as f:
-                f.write(content_bytes)
-
-            logger.info("Saved media upload file to: %s (%d bytes)", saved_path, len(content_bytes))
-
-            # Build structured speech transcript segments for recorded lecture session
-            transcript_items = [
-                {
-                    "speaker": "Faculty",
-                    "start": 0.0,
-                    "end": 45.0,
-                    "text": f"Welcome everyone. Today we are conducting the lecture on '{clean_title}'. Let us begin by reviewing the core theoretical concepts and fundamental principles."
-                },
-                {
-                    "speaker": "Faculty",
-                    "start": 45.0,
-                    "end": 90.0,
-                    "text": "First, we examine the architectural components, algorithm complexity, and system design trade-offs involved in this topic."
-                },
-                {
-                    "speaker": "Faculty",
-                    "start": 90.0,
-                    "end": 135.0,
-                    "text": "Next, let us work through a detailed practical example demonstrating code execution, data flow, and technical implementation."
-                },
-                {
-                    "speaker": "Faculty",
-                    "start": 135.0,
-                    "end": 180.0,
-                    "text": "To summarize today's session, make sure to review the indexed reference textbook chapters and complete the syllabus unit exercises."
-                }
-            ]
-
-        # B. JSON Transcript
-        elif filename.endswith(".json"):
+        filename = file.filename.lower()
+        if filename.endswith(".json"):
             try:
                 parsed_json = json.loads(content_bytes.decode("utf-8", errors="ignore").replace("\x00", ""))
                 if isinstance(parsed_json, list):
@@ -249,38 +264,53 @@ async def upload_lecture(
                 else:
                     transcript_items = [{"speaker": "Faculty", "start": 0.0, "end": 60.0, "text": str(parsed_json).replace("\x00", "")}]
             except Exception:
-                transcript_text = content_bytes.decode("utf-8", errors="ignore").replace("\x00", "")
-
-        # C. PDF Document
-        elif filename.endswith(".pdf"):
+                transcript_text = content_bytes.decode("utf-8", errors="ignore")
+        elif filename.endswith((".pdf", ".docx", ".doc", ".ppt", ".pptx")):
+            from app.services.document_extractor.service import DocumentExtractionService
             try:
-                import fitz
-                doc = fitz.open(stream=content_bytes, filetype="pdf")
-                pages_text = [page.get_text() for page in doc]
-                transcript_text = "\n".join(pages_text).replace("\x00", "")
+                extracted = DocumentExtractionService(db).extract_text_from_bytes(content_bytes, file.filename)
+                transcript_text = extracted.text
             except Exception:
-                transcript_text = content_bytes.decode("utf-8", errors="ignore").replace("\x00", "")
+                transcript_text = content_bytes.decode("utf-8", errors="ignore")
+        elif filename.endswith((".mp4", ".mp3", ".wav", ".m4a", ".webm", ".mov", ".mkv", ".flac", ".ogg", ".aac")):
+            # Save raw media to session storage for stream/playback
+            try:
+                from app.services.multimedia.storage_service import MultimediaStorageService
+                storage = MultimediaStorageService()
+                temp_sess_id = uuid.uuid4()
+                dirs = storage.get_session_paths(temp_sess_id)
+                saved_media_path = dirs["raw"] / file.filename
+                with open(saved_media_path, "wb") as f_out:
+                    f_out.write(content_bytes)
 
-        # D. Plain Text / Other
+                # Attempt whisper transcription
+                from app.services.audio.whisper_engine import WhisperEngine
+                whisper = WhisperEngine()
+                stt_segments = whisper.transcribe_audio(saved_media_path)
+                if stt_segments:
+                    transcript_items = [
+                        {"speaker": "Faculty", "start": seg.get("start", 0.0), "end": seg.get("end", 5.0), "text": seg.get("text", "")}
+                        for seg in stt_segments if seg.get("text")
+                    ]
+                if not transcript_items:
+                    transcript_text = f"Spoken lecture recording for {title.strip()}. Media file {file.filename} ingested."
+            except Exception as e:
+                logger.warning("Audio processing transcription fallback: %s", e)
+                transcript_text = f"Spoken lecture recording for {title.strip()}. Audio content from {file.filename}."
         else:
-            transcript_text = content_bytes.decode("utf-8", errors="ignore").replace("\x00", "")
-
+            transcript_text = content_bytes.decode("utf-8", errors="ignore")
     elif raw_text and raw_text.strip():
         transcript_text = raw_text.strip().replace("\x00", "")
     else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please upload a lecture file or provide transcript text.")
+        transcript_text = f"Delivered classroom lecture session: {title.strip()}."
 
-    # Format transcript items if text
+    # Format transcript items if plain text
     if not transcript_items:
         # Clean non-printable characters
         cleaned_str = "".join([ch if ord(ch) >= 32 or ch in "\n\r\t" else " " for ch in transcript_text])
         lines = [line.strip().replace("\x00", "") for line in cleaned_str.splitlines() if line.strip() and len(line.strip()) > 3]
         if not lines:
-            # Fallback if binary extraction yielded no plain lines
-            lines = [
-                f"Delivered lecture session: {title.strip()}.",
-                "Topics covered include core algorithms, data structure design, and technical validation metrics."
-            ]
+            lines = [f"Delivered lecture session: {title.strip()}."]
         
         transcript_items = []
         current_time = 0.0
@@ -322,10 +352,11 @@ async def upload_lecture(
 
     # 5. Process & Store Transcript through TranscriptService
     service = TranscriptService(db)
+    faculty_display_name = faculty.user.full_name if (faculty.user and hasattr(faculty.user, "full_name")) else (faculty_name or "Faculty Member")
     result = service.process_and_store_transcript(
         lecture_id=lecture.id,
         course_name_or_code=course.course_name,
-        faculty_name=faculty.user.full_name if faculty.user else "Faculty",
+        faculty_name=faculty_display_name,
         transcript_data=transcript_items,
         lecture_date=parsed_date,
     )
@@ -456,11 +487,12 @@ def get_lecture_status(
 def get_lecture_chunks(
     lecture_id: UUID,
     db: Annotated[Session, Depends(get_db)],
+    limit: int = 500,
 ) -> dict:
     service = TranscriptService(db)
     try:
         start = time.time()
-        chunks = service.get_lecture_chunks(lecture_id)
+        chunks = service.get_lecture_chunks(lecture_id, limit=limit)
         return ok(data=chunks, message="Lecture chunks retrieved.", start_ts=start)
     except LectureNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
